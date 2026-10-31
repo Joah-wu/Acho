@@ -18,15 +18,15 @@
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STM32F1_SD_H
-#define __STM32F1_SD_H
+#ifndef __STM32F4_SD_H
+#define __STM32F4_SD_H
 
 #ifdef __cplusplus
  extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 
 /* Exported types --------------------------------------------------------*/
 /**
@@ -87,4 +87,4 @@ void    BSP_SD_ReadCpltCallback(void);
 }
 #endif
 
-#endif /* __STM32F1_SD_H */
+#endif /* __STM32F4_SD_H */

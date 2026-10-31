@@ -19,7 +19,7 @@
 #include "lv_port_disp.h"
 #include "lv_port_fs.h"
 #include "lv_port_indev.h"
-#include "../../User/bsp_key.h"
+#include "bsp_key.h"
 #include "usbd_def.h"
 #include "usbd_core.h"
 #include "sdio.h"
@@ -27,8 +27,8 @@
 #include "fatfs.h"
 #include "pages/page_main.h"
 #include "gui_setup.h"
-#include "../../User/fops.h"
-#include "../../User/bsp_usart.h"
+#include "fops.h"
+#include "bsp_usart.h"
 #include "pages/page_audio.h"
 #include "WM8960Apps.h"
 /* USER CODE END Header */
@@ -45,6 +45,7 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN PTD */
 extern TIM_HandleTypeDef htim4;
 /* USER CODE END PTD */
@@ -63,39 +64,75 @@ extern TIM_HandleTypeDef htim4;
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-osThreadId defaultTaskHandle;
-uint32_t defaultTaskBuffer[ 1024 ];
-osStaticThreadDef_t defaultTaskControlBlock;
-osThreadId mainTaskHandle;
-uint32_t mainTaskBuffer[ 1024 ];
-osStaticThreadDef_t mainTaskControlBlock;
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for GUITask */
+osThreadId_t GUITaskHandle;
+uint32_t GUITaskBuffer[ 1024 ];
+osStaticThreadDef_t GUITaskControlBlock;
+const osThreadAttr_t GUITask_attributes = {
+  .name = "GUITask",
+  .cb_mem = &GUITaskControlBlock,
+  .cb_size = sizeof(GUITaskControlBlock),
+  .stack_mem = &GUITaskBuffer[0],
+  .stack_size = sizeof(GUITaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for audioTask */
+osThreadId_t audioTaskHandle;
+uint32_t audioTaskBuffer[ 1024 ];
+osStaticThreadDef_t audioTaskControlBlock;
+const osThreadAttr_t audioTask_attributes = {
+  .name = "audioTask",
+  .cb_mem = &audioTaskControlBlock,
+  .cb_size = sizeof(audioTaskControlBlock),
+  .stack_mem = &audioTaskBuffer[0],
+  .stack_size = sizeof(audioTaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal1,
+};
+/* Definitions for dataTransferTas */
+osThreadId_t dataTransferTasHandle;
+uint32_t dataTransferTasBuffer[ 1024 ];
+osStaticThreadDef_t dataTransferTasControlBlock;
+const osThreadAttr_t dataTransferTas_attributes = {
+  .name = "dataTransferTas",
+  .cb_mem = &dataTransferTasControlBlock,
+  .cb_size = sizeof(dataTransferTasControlBlock),
+  .stack_mem = &dataTransferTasBuffer[0],
+  .stack_size = sizeof(dataTransferTasBuffer),
+  .priority = (osPriority_t) osPriorityNormal2,
+};
+/* Definitions for syscheckTask */
+osThreadId_t syscheckTaskHandle;
+uint32_t syscheckTaskBuffer[ 512 ];
+osStaticThreadDef_t syscheckTaskControlBlock;
+const osThreadAttr_t syscheckTask_attributes = {
+  .name = "syscheckTask",
+  .cb_mem = &syscheckTaskControlBlock,
+  .cb_size = sizeof(syscheckTaskControlBlock),
+  .stack_mem = &syscheckTaskBuffer[0],
+  .stack_size = sizeof(syscheckTaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal3,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 
 /* USER CODE END FunctionPrototypes */
 
-void StartDefaultTask(void const * argument);
-void StartMainTask(void const * argument);
+void StartDefaultTask(void *argument);
+void StartGUITask(void *argument);
+void StartAudioTask(void *argument);
+void StartDataTransferTask(void *argument);
+void StartSyscheckTask(void *argument);
 
-extern void MX_USB_DEVICE_Init(void);
+extern void MX_USB_HOST_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
-
-/* GetIdleTaskMemory prototype (linked to static allocation support) */
-void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
-
-/* USER CODE BEGIN GET_IDLE_TASK_MEMORY */
-static StaticTask_t xIdleTaskTCBBuffer;
-static StackType_t xIdleStack[configMINIMAL_STACK_SIZE];
-
-void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer,
-                                   uint32_t *pulIdleTaskStackSize) {
-    *ppxIdleTaskTCBBuffer = &xIdleTaskTCBBuffer;
-    *ppxIdleTaskStackBuffer = &xIdleStack[0];
-    *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
-    /* place for user code */
-}
-/* USER CODE END GET_IDLE_TASK_MEMORY */
 
 /**
   * @brief  FreeRTOS initialization
@@ -124,17 +161,28 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadStaticDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 1024, defaultTaskBuffer, &defaultTaskControlBlock);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
-  /* definition and creation of mainTask */
-  osThreadStaticDef(mainTask, StartMainTask, osPriorityNormal, 0, 1024, mainTaskBuffer, &mainTaskControlBlock);
-  mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
+  /* creation of GUITask */
+  GUITaskHandle = osThreadNew(StartGUITask, NULL, &GUITask_attributes);
+
+  /* creation of audioTask */
+  audioTaskHandle = osThreadNew(StartAudioTask, NULL, &audioTask_attributes);
+
+  /* creation of dataTransferTas */
+  dataTransferTasHandle = osThreadNew(StartDataTransferTask, NULL, &dataTransferTas_attributes);
+
+  /* creation of syscheckTask */
+  syscheckTaskHandle = osThreadNew(StartSyscheckTask, NULL, &syscheckTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
     vTaskSuspend(mainTaskHandle);
   /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
 
 }
 
@@ -145,10 +193,10 @@ void MX_FREERTOS_Init(void) {
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+void StartDefaultTask(void *argument)
 {
-  /* init code for USB_DEVICE */
-  MX_USB_DEVICE_Init();
+  /* init code for USB_HOST */
+  MX_USB_HOST_Init();
   /* USER CODE BEGIN StartDefaultTask */
     static portTickType PreviousWakeTime;
     const portTickType TimeIncrement = pdMS_TO_TICKS(5);
@@ -174,91 +222,89 @@ void StartDefaultTask(void const * argument)
   /* USER CODE END StartDefaultTask */
 }
 
-/* USER CODE BEGIN Header_StartMainTask */
+/* USER CODE BEGIN Header_StartGUITask */
 /**
-* @brief Function implementing the mainTask thread.
+* @brief Function implementing the GUITask thread.
 * @param argument: Not used
 * @retval None
 */
-
-#define EventBit_USBConnect 0x01
-#define EventBit_USBDisconnect 0x02
-
-/* USER CODE END Header_StartMainTask */
-void StartMainTask(void const * argument)
+/* USER CODE END Header_StartGUITask */
+void StartGUITask(void *argument)
 {
-  /* USER CODE BEGIN StartMainTask */
-    static portTickType PreviousWakeTime;
-    const portTickType TimeIncrement = pdMS_TO_TICKS(5);
-    PreviousWakeTime = xTaskGetTickCount();
+  /* USER CODE BEGIN StartGUITask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartGUITask */
+}
 
-    extern void lv_example4(void);
-    lv_example4();
-//	vTaskDelay(3000);
-//	vTaskDelete(NULL);
-    //lv_example1();
-    /* Infinite loop */
-//	lv_obj_t *sym_label = lv_label_create(lv_scr_act());
-//	lv_obj_align(sym_label,LV_ALIGN_TOP_LEFT,0,0);
-//	lv_obj_set_style_text_font(sym_label,&lv_font_montserrat_18,0);
-//	lv_label_set_text(sym_label,"");
-    for (;;) {
-        lv_task_handler();
-//		if(osSignalWait(EventBit_USBConnect,1).status==osEventSignal)
-//		{
-//			lv_label_set_text(sym_label, LV_SYMBOL_USB);
-//		}
-//		else if(osSignalWait(EventBit_USBDisconnect,1).status==osEventSignal)
-//		{
-//			lv_label_set_text(sym_label,"");
-//		}
-        vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
-    }
-  /* USER CODE END StartMainTask */
+/* USER CODE BEGIN Header_StartAudioTask */
+/**
+* @brief Function implementing the audioTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartAudioTask */
+void StartAudioTask(void *argument)
+{
+  /* USER CODE BEGIN StartAudioTask */
+  static portTickType PreviousWakeTime;
+  const portTickType TimeIncrement = pdMS_TO_TICKS(5);
+  PreviousWakeTime = xTaskGetTickCount();
+  setup_ui(&ui_main, &ui_ROOT, NULL);
+  /* Infinite loop */
+  for(;;)
+  {
+    lv_task_handler();
+    vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
+  }
+  /* USER CODE END StartAudioTask */
+}
+
+/* USER CODE BEGIN Header_StartDataTransferTask */
+/**
+* @brief Function implementing the dataTransferTas thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartDataTransferTask */
+void StartDataTransferTask(void *argument)
+{
+  /* USER CODE BEGIN StartDataTransferTask */
+  static portTickType PreviousWakeTime;
+  const portTickType TimeIncrement = pdMS_TO_TICKS(100);
+  PreviousWakeTime = xTaskGetTickCount();
+  /* Infinite loop */
+  for(;;)
+  {
+    vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
+  }
+  /* USER CODE END StartDataTransferTask */
+}
+
+/* USER CODE BEGIN Header_StartSyscheckTask */
+/**
+* @brief Function implementing the syscheckTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSyscheckTask */
+void StartSyscheckTask(void *argument)
+{
+  /* USER CODE BEGIN StartSyscheckTask */
+  static portTickType PreviousWakeTime;
+  const portTickType TimeIncrement = pdMS_TO_TICKS(100);
+  PreviousWakeTime = xTaskGetTickCount();
+  /* Infinite loop */
+  for(;;)
+  {
+    vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
+  }
+  /* USER CODE END StartSyscheckTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-
-void lv_example4(void) {
-    setup_ui(&ui_main, &ui_ROOT, NULL);
-//    uint8_t path[] = "0:heaven.mp3";
-//    uint8_t path[] = "0:song.flac";
-//    audio_play(path);
-//    uint8_t path2[] = "0:heaven.mp3";
-//    audio_play(path2);
-//    uint8_t path1[] = "0:travel.mp3";
-//    audio_play(path1);
-}
-
-
-
-
-
-
-
-
-
-
-/**USB???**/
-//void App_USB_State_IRQHandler(void)
-//{
-// static uint8_t old_state = 0;
-//  /* ???usb?è±????????ä»? */
-//  if(old_state)
-//  {
-//    /* USB???? */
-//   if(pdev->dev_state == USBD_STATE_CONFIGURED) 
-//   {       
-//     osSignalSet (mainTaskHandle, EventBit_USBConnect);  
-//   }
-//   /* USB??? */
-//   else if(pdev->dev_state==USBD_STATE_SUSPENDED)
-//   {
-//     osSignalSet (mainTaskHandle, EventBit_USBDisconnect);  
-//   }
-//    old_state = pdev->dev_state;
-//  }
-//}
-/* USER CODE END Application */
 
