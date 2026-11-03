@@ -11,6 +11,8 @@
  *********************/
 #include "lv_port_indev.h"
 #include "lvgl.h"
+#include "main.h"
+#include "tim.h"
 #include "../../../User/bsp_key.h"
 
 /*********************
@@ -41,7 +43,6 @@ static uint32_t keypad_get_key(void);
 
 static void encoder_init(void);
 static void encoder_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
-static void encoder_handler(void);
 
 static void button_init(void);
 static void button_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
@@ -57,8 +58,10 @@ lv_indev_t * indev_keypad;
 lv_indev_t * indev_encoder;
 lv_indev_t * indev_button;
 
-static int32_t encoder_diff;
-static lv_indev_state_t encoder_state;
+/* TIM3 is configured in encoder mode. Tune this if the mechanical encoder
+ * produces a different number of timer counts per detent. */
+#define ENCODER_COUNTS_PER_STEP  2
+static int32_t encoder_remainder;
 
 /**********************
  *      MACROS
@@ -329,54 +332,33 @@ static uint32_t keypad_get_key(void)
 /*Initialize your keypad*/
 static void encoder_init(void)
 {
-    /*Your code comes here*/
+    __HAL_TIM_SET_COUNTER(&htim3, 0);
+    encoder_remainder = 0;
 }
 
 /*Will be called by the library to read the encoder*/
 static void encoder_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
-    int16_t encode;
-    encode = TIM4->CNT;TIM4->CNT=0;
-    if(encode>2)encode=-1;
-    else if(encode<-2)encode=1;
-    else encode=0;
-    data->enc_diff = encode;
-    data->state = HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_4)==GPIO_PIN_RESET?LV_INDEV_STATE_PR:LV_INDEV_STATE_REL;
-//    encoder_diff=0;
-}
+    int16_t delta = (int16_t)__HAL_TIM_GET_COUNTER(&htim3);
+    __HAL_TIM_SET_COUNTER(&htim3, 0);
+    encoder_remainder += delta;
 
-/*Call this function in an interrupt to process encoder events (turn, press)*/
-static void encoder_handler(void)
-{
-    /*Your code comes here*/
-//    encoder_state = LV_INDEV_STATE_PR;
-//		if(KEY2READ)
-//		{
-//			//act_key = LV_KEY_ENTER		//_lv_indev_read函数里已经帮我们默认写好了
-//			encoder_state = LV_INDEV_STATE_PR;
-//			PBout(5)=0;
-//			return;
-//		}
-//		else
-//		{
-//			PBout(5)=1;
-//			encoder_state = LV_INDEV_STATE_REL;
-//		}
-//		if(KEY1READ)
-//		{
-//			PBout(5)=0;
-//			encoder_diff+=1;
-//		}
-//		else
-//		{
-//			PBout(5)=1;
-//		}
-    //encoder_diff += 0;
-    //encoder_state = LV_INDEV_STATE_REL;//LV_INDEV_STATE_PR
-}
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	encoder_handler();
+    data->enc_diff = 0;
+    if(encoder_remainder >= ENCODER_COUNTS_PER_STEP) {
+        /* Keep the existing UI direction: increasing TIM3 count means previous. */
+        data->enc_diff = -1;
+        encoder_remainder -= ENCODER_COUNTS_PER_STEP;
+    }
+    else if(encoder_remainder <= -ENCODER_COUNTS_PER_STEP) {
+        data->enc_diff = 1;
+        encoder_remainder += ENCODER_COUNTS_PER_STEP;
+    }
+
+    data->continue_reading = (encoder_remainder >= ENCODER_COUNTS_PER_STEP) ||
+                             (encoder_remainder <= -ENCODER_COUNTS_PER_STEP);
+    data->state = (HAL_GPIO_ReadPin(ENCODER_ENTER_GPIO_Port, ENCODER_ENTER_Pin) == GPIO_PIN_RESET)
+                      ? LV_INDEV_STATE_PR
+                      : LV_INDEV_STATE_REL;
 }
 /*------------------
  * Button

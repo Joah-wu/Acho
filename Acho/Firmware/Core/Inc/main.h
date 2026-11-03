@@ -57,6 +57,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define ST25D_GPO_Pin GPIO_PIN_13
+#define ST25D_GPO_GPIO_Port GPIOC
 #define BAT_VOTAGE_ADC_Pin GPIO_PIN_0
 #define BAT_VOTAGE_ADC_GPIO_Port GPIOC
 #define WM8960_HP_ADC_Pin GPIO_PIN_1
@@ -69,10 +71,6 @@ void Error_Handler(void);
 #define READY_GPIO_Port GPIOA
 #define WIFI_EN_Pin GPIO_PIN_1
 #define WIFI_EN_GPIO_Port GPIOA
-#define WIFI_UART_RX_Pin GPIO_PIN_2
-#define WIFI_UART_RX_GPIO_Port GPIOA
-#define WIFI_UART_TX_Pin GPIO_PIN_3
-#define WIFI_UART_TX_GPIO_Port GPIOA
 #define MLCD_DISP_Pin GPIO_PIN_4
 #define MLCD_DISP_GPIO_Port GPIOA
 #define MLCD_CLK_Pin GPIO_PIN_5
@@ -81,14 +79,14 @@ void Error_Handler(void);
 #define MLCD_MOSI_GPIO_Port GPIOA
 #define MLCD_CS_Pin GPIO_PIN_4
 #define MLCD_CS_GPIO_Port GPIOC
-#define MLCD_EXTCOMN_Pin GPIO_PIN_5
-#define MLCD_EXTCOMN_GPIO_Port GPIOC
+#define MLCD_EXTCOMIN_Pin GPIO_PIN_5
+#define MLCD_EXTCOMIN_GPIO_Port GPIOC
 #define MLCD_MODE_Pin GPIO_PIN_0
 #define MLCD_MODE_GPIO_Port GPIOB
 #define BEEP_Pin GPIO_PIN_2
 #define BEEP_GPIO_Port GPIOB
-#define STD25_I2C_SCL_Pin GPIO_PIN_10
-#define STD25_I2C_SCL_GPIO_Port GPIOB
+#define ST25D_I2C_SCL_Pin GPIO_PIN_10
+#define ST25D_I2C_SCL_GPIO_Port GPIOB
 #define WM8960_I2S_LRCLK_Pin GPIO_PIN_12
 #define WM8960_I2S_LRCLK_GPIO_Port GPIOB
 #define WM8960_I2S_BCLK_Pin GPIO_PIN_13
@@ -113,6 +111,8 @@ void Error_Handler(void);
 #define USB_P_GPIO_Port GPIOA
 #define SDIO_DETECT_Pin GPIO_PIN_15
 #define SDIO_DETECT_GPIO_Port GPIOA
+#define ST25D_I2C_SDA_Pin GPIO_PIN_3
+#define ST25D_I2C_SDA_GPIO_Port GPIOB
 #define ENCODER_TIM3_CH1_Pin GPIO_PIN_4
 #define ENCODER_TIM3_CH1_GPIO_Port GPIOB
 #define ENCODER_TIM3_CH2_Pin GPIO_PIN_5
@@ -121,8 +121,8 @@ void Error_Handler(void);
 #define ENCODER_ENTER_GPIO_Port GPIOB
 #define WM8960_I2C_SDA_Pin GPIO_PIN_7
 #define WM8960_I2C_SDA_GPIO_Port GPIOB
-#define WM8950_I2C_SCL_Pin GPIO_PIN_8
-#define WM8950_I2C_SCL_GPIO_Port GPIOB
+#define WM8960_I2C_SCL_Pin GPIO_PIN_8
+#define WM8960_I2C_SCL_GPIO_Port GPIOB
 #define LED_Pin GPIO_PIN_9
 #define LED_GPIO_Port GPIOB
 

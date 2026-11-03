@@ -52,7 +52,7 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, TX_HOLD_Pin|MLCD_CS_Pin|MLCD_EXTCOMN_Pin|WM8960_I2S_MCLK_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, TX_HOLD_Pin|MLCD_CS_Pin|MLCD_EXTCOMIN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, READY_Pin|WIFI_EN_Pin|MLCD_DISP_Pin|USB_ENABLE_Pin, GPIO_PIN_RESET);
@@ -60,14 +60,14 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, MLCD_MODE_Pin|SPK_EN_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PC13 RX_HOLD_Pin USB_DETECT_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_13|RX_HOLD_Pin|USB_DETECT_Pin;
+  /*Configure GPIO pins : ST25D_GPO_Pin RX_HOLD_Pin USB_DETECT_Pin */
+  GPIO_InitStruct.Pin = ST25D_GPO_Pin|RX_HOLD_Pin|USB_DETECT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TX_HOLD_Pin MLCD_CS_Pin MLCD_EXTCOMN_Pin WM8960_I2S_MCLK_Pin */
-  GPIO_InitStruct.Pin = TX_HOLD_Pin|MLCD_CS_Pin|MLCD_EXTCOMN_Pin|WM8960_I2S_MCLK_Pin;
+  /*Configure GPIO pins : TX_HOLD_Pin MLCD_CS_Pin MLCD_EXTCOMIN_Pin */
+  GPIO_InitStruct.Pin = TX_HOLD_Pin|MLCD_CS_Pin|MLCD_EXTCOMIN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -96,7 +96,7 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : ENCODER_ENTER_Pin */
   GPIO_InitStruct.Pin = ENCODER_ENTER_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(ENCODER_ENTER_GPIO_Port, &GPIO_InitStruct);
 
 }

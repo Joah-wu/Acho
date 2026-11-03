@@ -3,7 +3,7 @@
  * @file  fops.c
  * @autor lakun@qq.com
  * @data  2020/3/5
- * @note  FatFs²Ù×÷SD¿¨API
+ * @note  FatFsæ“ä½œSDå¡API
  */
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -12,128 +12,110 @@
 #include "fatfs.h"
 #include "stdio.h"
 #include "string.h"
+#include "bsp_usart.h"
 
 
-FILINFO fileinfo;    //ÎÄ¼şĞÅÏ¢
-#if _USE_LFN
+FILINFO fileinfo;    //æ–‡ä»¶ä¿¡æ¯
 char global_BUFF[_MAX_LFN * 2 + 1];
-#endif
 const uint8_t *FILE_TYPE_TBL[6][13] =
         {
-                {"BIN"},            //BINÎÄ¼ş
-                {"LRC"},            //LRCÎÄ¼ş
-                {"NES"},            //NESÎÄ¼ş
-                {"TXT", "C",   "H"},    //ÎÄ±¾ÎÄ¼ş
-                {"MP1", "MP2", "MP3",  "MP4", "M4A", "3GP", "3G2", "OGG", "ACC", "WMA", "WAV", "MID", "FLAC"},//ÒôÀÖÎÄ¼ş
-                {"BMP", "JPG", "JPEG", "GIF"},//Í¼Æ¬ÎÄ¼ş
+                {"BIN"},            //BINæ–‡ä»¶
+                {"LRC"},            //LRCæ–‡ä»¶
+                {"NES"},            //NESæ–‡ä»¶
+                {"TXT", "C",   "H"},    //æ–‡æœ¬æ–‡ä»¶
+                {"MP1", "MP2", "MP3",  "MP4", "M4A", "3GP", "3G2", "OGG", "ACC", "WMA", "WAV", "MID", "FLAC"},//éŸ³ä¹æ–‡ä»¶
+                {"BMP", "JPG", "JPEG", "GIF"},//å›¾ç‰‡æ–‡ä»¶
         };
 
 
-//ÏÔÊ¾Ê£ÓàÈİÁ¿
-//drv:ÅÌ·û
-//·µ»ØÖµ:Ê£ÓàÈİÁ¿(×Ö½Ú)
+//æ˜¾ç¤ºå‰©ä½™å®¹é‡
+//drv:ç›˜ç¬¦
+//è¿”å›å€¼:å‰©ä½™å®¹é‡(å­—èŠ‚)
 uint32_t exf_showfree(uint8_t *drv) {
     FATFS *fs1;
     uint8_t res;
     uint32_t fre_clust = 0, fre_sect = 0, tot_sect = 0;
-    //µÃµ½´ÅÅÌĞÅÏ¢¼°¿ÕÏĞ´ØÊıÁ¿
+    //å¾—åˆ°ç£ç›˜ä¿¡æ¯åŠç©ºé—²ç°‡æ•°é‡
     res = f_getfree((const TCHAR *) drv, (DWORD *) &fre_clust, &fs1);
     if (res == 0) {
-        tot_sect = (fs1->n_fatent - 2) * fs1->csize;//µÃµ½×ÜÉÈÇøÊı
-        fre_sect = fre_clust * fs1->csize;            //µÃµ½¿ÕÏĞÉÈÇøÊı
+        tot_sect = (fs1->n_fatent - 2) * fs1->csize;//å¾—åˆ°æ€»æ‰‡åŒºæ•°
+        fre_sect = fre_clust * fs1->csize;            //å¾—åˆ°ç©ºé—²æ‰‡åŒºæ•°
 #if _MAX_SS != 512
         tot_sect*=fs1->ssize/512;
         fre_sect*=fs1->ssize/512;
 #endif
-        if (tot_sect < 20480)//×ÜÈİÁ¿Ğ¡ÓÚ10M
+        if (tot_sect < 20480)//æ€»å®¹é‡å°äº10M
         {
             /* Print free space in unit of KB (assuming 512 bytes/sector) */
-            printf("\r\n´ÅÅÌ×ÜÈİÁ¿:%d KB\r\n"
-                   "¿ÉÓÃ¿Õ¼ä:%d KB\r\n",
-                   tot_sect >> 1, fre_sect >> 1);
+            Printf("\r\nSD total: %lu KB\r\n"
+                   "SD free: %lu KB\r\n",
+                   (unsigned long)(tot_sect >> 1),
+                   (unsigned long)(fre_sect >> 1));
         } else {
             /* Print free space in unit of KB (assuming 512 bytes/sector) */
-            printf("\r\n´ÅÅÌ×ÜÈİÁ¿:%d MB\r\n"
-                   "¿ÉÓÃ¿Õ¼ä:%d MB\r\n",
-                   tot_sect >> 11, fre_sect >> 11);
+            Printf("\r\nSD total: %lu MB\r\n"
+                   "SD free: %lu MB\r\n",
+                   (unsigned long)(tot_sect >> 11),
+                   (unsigned long)(fre_sect >> 11));
         }
     }
     return fre_sect;
 }
 
 void exf_mount(void) {
-    printf("# SD Card Mount %s!\r\n", f_mount(&SDFatFS, SDPath, 1) == FR_OK ? "Successfullly" : "Failed");
+    Printf("# SD Card Mount %s!\r\n", f_mount(&SDFatFS, SDPath, 1) == FR_OK ? "Successfullly" : "Failed");
 }
 
 
 uint8_t exf_readdir(DIR *dir) {
     uint8_t res;
     char *fn;
-#if _USE_LFN
-    fileinfo.lfsize = _MAX_LFN * 2 + 1;
-    fileinfo.lfname = global_BUFF;
-#endif
-    res = f_readdir(dir, &fileinfo);//¶ÁÈ¡Ò»¸öÎÄ¼şµÄĞÅÏ¢
+    res = f_readdir(dir, &fileinfo);//è¯»å–ä¸€ä¸ªæ–‡ä»¶çš„ä¿¡æ¯
     if (res != FR_OK || fileinfo.fname[0] == 0) {
-        printf("error");
-        return res;//¶ÁÍêÁË.
+        Printf("error");
+        return res;//è¯»å®Œäº†.
     }
-#if _USE_LFN
-    fn = *fileinfo.lfname ? fileinfo.lfname : fileinfo.fname;
-#else
     fn=fileinfo.fname;
-#endif
-    printf("\r\n DIR info:\r\n");
+    Printf("\r\n DIR info:\r\n");
 
-    printf("dir.id:%d\r\n", dir->id);
-    printf("dir.index:%d\r\n", dir->index);
-    printf("dir.sclust:%d\r\n", dir->sclust);
-    printf("dir.clust:%d\r\n", dir->clust);
-    printf("dir.sect:%d\r\n", dir->sect);
+    Printf("dir.clust:%d\r\n", dir->clust);
+    Printf("dir.sect:%d\r\n", dir->sect);
 
-    printf("\r\n");
-    printf("File Name is:%s\r\n", fn);
-    printf("File Size is:%d\r\n", fileinfo.fsize);
-    printf("File data is:%d\r\n", fileinfo.fdate);
-    printf("File time is:%d\r\n", fileinfo.ftime);
-    printf("File Attr is:%d\r\n", fileinfo.fattrib);
-    printf("\r\n");
+    Printf("\r\n");
+    Printf("File Name is:%s\r\n", fn);
+    Printf("File Size is:%d\r\n", fileinfo.fsize);
+    Printf("File data is:%d\r\n", fileinfo.fdate);
+    Printf("File time is:%d\r\n", fileinfo.ftime);
+    Printf("File Attr is:%d\r\n", fileinfo.fattrib);
+    Printf("\r\n");
     //myfree(fileinfo.lfname);
     return 0;
 }
 
-//±éÀúÎÄ¼ş
-//path:Â·¾¶
-//·µ»ØÖµ:Ö´ĞĞ½á¹û
+//éå†æ–‡ä»¶
+//path:è·¯å¾„
+//è¿”å›å€¼:æ‰§è¡Œç»“æœ
 uint8_t exf_scan_files(DIR *dir, char **file_name,DWORD *file_size,uint8_t offset) {
     if (!dir)return FR_INVALID_PARAMETER;
     FRESULT res;
     char *fn;   /* This function is assuming non-Unicode cfg. */
     uint8_t index = 0;
-#if _USE_LFN
-    memset(global_BUFF,0, sizeof(global_BUFF));
-    fileinfo.lfsize = _MAX_LFN * 2 + 1;
-//    fileinfo.lfname = global_BUFF;//mymalloc(fileinfo.lfsize);
-#endif
     if (file_name != NULL)
         *file_name = NULL;
-//    res = f_opendir(dir, (const TCHAR *) path); //´ò¿ªÒ»¸öÄ¿Â¼
+//    res = f_opendir(dir, (const TCHAR *) path); //æ‰“å¼€ä¸€ä¸ªç›®å½•
     while (1) {
-        res = f_readdir(dir, &fileinfo);                   //¶ÁÈ¡Ä¿Â¼ÏÂµÄÒ»¸öÎÄ¼ş
+        res = f_readdir(dir, &fileinfo);                   //è¯»å–ç›®å½•ä¸‹çš„ä¸€ä¸ªæ–‡ä»¶
         if (res != FR_OK || fileinfo.fname[0] == 0) {
             f_closedir(dir);
             return FR_NO_FILE;
-        }  //´íÎóÁË/µ½Ä©Î²ÁË,ÍË³ö
-        if (fileinfo.fname[0] == '.') continue;             //ºöÂÔÉÏ¼¶Ä¿Â¼
+        }  //é”™è¯¯äº†/åˆ°æœ«å°¾äº†,é€€å‡º
+        if (fileinfo.fname[0] == '.') continue;             //å¿½ç•¥ä¸Šçº§ç›®å½•
         else if(index!=offset){
             index++;
             continue;
         }
-#if _USE_LFN
-        fn = *fileinfo.lfname ? fileinfo.lfname : fileinfo.fname;
-#else
         fn = fileinfo.fname;
-#endif                                                  /* It is a file. */
+                                                        /* It is a file. */
         if(file_name)
             *file_name = fn;
         if(file_size)
@@ -145,28 +127,28 @@ uint8_t exf_scan_files(DIR *dir, char **file_name,DWORD *file_size,uint8_t offse
     return res;
 }
 
-//½«Ğ¡Ğ´×ÖÄ¸×ªÎª´óĞ´×ÖÄ¸,Èç¹ûÊÇÊı×Ö,Ôò±£³Ö²»±ä.
+//å°†å°å†™å­—æ¯è½¬ä¸ºå¤§å†™å­—æ¯,å¦‚æœæ˜¯æ•°å­—,åˆ™ä¿æŒä¸å˜.
 uint8_t char_upper(uint8_t c) {
-    if (c < 'A')return c;//Êı×Ö,±£³Ö²»±ä.
-    if (c >= 'a')return c - 0x20;//±äÎª´óĞ´.
-    else return c;//´óĞ´,±£³Ö²»±ä
+    if (c < 'A')return c;//æ•°å­—,ä¿æŒä¸å˜.
+    if (c >= 'a')return c - 0x20;//å˜ä¸ºå¤§å†™.
+    else return c;//å¤§å†™,ä¿æŒä¸å˜
 }
 
-//±¨¸æÎÄ¼şµÄÀàĞÍ
-//fname:ÎÄ¼şÃû
-//·µ»ØÖµ:0XFF,±íÊ¾ÎŞ·¨Ê¶±ğµÄÎÄ¼şÀàĞÍ±àºÅ.
-//		 ÆäËû,¸ßËÄÎ»±íÊ¾ËùÊô´óÀà,µÍËÄÎ»±íÊ¾ËùÊôĞ¡Àà.
+//æŠ¥å‘Šæ–‡ä»¶çš„ç±»å‹
+//fname:æ–‡ä»¶å
+//è¿”å›å€¼:0XFF,è¡¨ç¤ºæ— æ³•è¯†åˆ«çš„æ–‡ä»¶ç±»å‹ç¼–å·.
+//		 å…¶ä»–,é«˜å››ä½è¡¨ç¤ºæ‰€å±å¤§ç±»,ä½å››ä½è¡¨ç¤ºæ‰€å±å°ç±».
 uint8_t f_typetell(uint8_t *fname) {
     uint8_t tbuf[5];
-    uint8_t *attr = '\0';//ºó×ºÃû
+    uint8_t *attr = '\0';//åç¼€å
     uint8_t i = 0, j;
     while (i < 250) {
         i++;
-        if (*fname == '\0')break;//Æ«ÒÆµ½ÁË×îºóÁË.
+        if (*fname == '\0')break;//åç§»åˆ°äº†æœ€åäº†.
         fname++;
     }
-    if (i == 250)return 0XFF;//´íÎóµÄ×Ö·û´®.
-    for (i = 0; i < 5; i++)//µÃµ½ºó×ºÃû
+    if (i == 250)return 0XFF;//é”™è¯¯çš„å­—ç¬¦ä¸².
+    for (i = 0; i < 5; i++)//å¾—åˆ°åç¼€å
     {
         fname--;
         if (*fname == '.') {
@@ -176,22 +158,22 @@ uint8_t f_typetell(uint8_t *fname) {
         }
     }
     strcpy((char *) tbuf, (const char *) attr);//copy
-    for (i = 0; i < 4; i++)tbuf[i] = char_upper(tbuf[i]);//È«²¿±äÎª´óĞ´
+    for (i = 0; i < 4; i++)tbuf[i] = char_upper(tbuf[i]);//å…¨éƒ¨å˜ä¸ºå¤§å†™
     for (i = 0; i < 6; i++) {
         for (j = 0; j < 13; j++) {
-            if (*FILE_TYPE_TBL[i][j] == 0)break;//´Ë×éÒÑ¾­Ã»ÓĞ¿É¶Ô±ÈµÄ³ÉÔ±ÁË.
-            if (strcmp((const char *) FILE_TYPE_TBL[i][j], (const char *) tbuf) == 0)//ÕÒµ½ÁË
+            if (*FILE_TYPE_TBL[i][j] == 0)break;//æ­¤ç»„å·²ç»æ²¡æœ‰å¯å¯¹æ¯”çš„æˆå‘˜äº†.
+            if (strcmp((const char *) FILE_TYPE_TBL[i][j], (const char *) tbuf) == 0)//æ‰¾åˆ°äº†
             {
                 return (i << 4) | j;
             }
         }
     }
-    return 0XFF;//Ã»ÕÒµ½
+    return 0XFF;//æ²¡æ‰¾åˆ°
 }
 
 #if _USE_LABEL
-//»ñÈ¡ÅÌ·û£¨´ÅÅÌÃû×Ö£©
-//path:´ÅÅÌÂ·¾¶£¬±ÈÈç"0:"¡¢"1:"  
+//è·å–ç›˜ç¬¦ï¼ˆç£ç›˜åå­—ï¼‰
+//path:ç£ç›˜è·¯å¾„ï¼Œæ¯”å¦‚"0:"ã€"1:"  
 void exf_getlabel(uint8_t *path)
 {
     uint8_t buf[20];
@@ -200,19 +182,19 @@ void exf_getlabel(uint8_t *path)
     res=f_getlabel ((const TCHAR *)path,(TCHAR *)buf,(DWORD*)&sn);
     if(res==FR_OK)
     {
-        printf("\r\n´ÅÅÌ%s µÄÅÌ·ûÎª:%s\r\n",path,buf);
-        printf("´ÅÅÌ%s µÄĞòÁĞºÅ:%X\r\n\r\n",path,sn);
-    }else printf("\r\n»ñÈ¡Ê§°Ü£¬´íÎóÂë:%X\r\n",res);
+        Printf("\r\nç£ç›˜%s çš„ç›˜ç¬¦ä¸º:%s\r\n",path,buf);
+        Printf("ç£ç›˜%s çš„åºåˆ—å·:%X\r\n\r\n",path,sn);
+    }else Printf("\r\nè·å–å¤±è´¥ï¼Œé”™è¯¯ç :%X\r\n",res);
 }
-//ÉèÖÃÅÌ·û£¨´ÅÅÌÃû×Ö£©£¬×î³¤11¸ö×Ö·û£¡£¡£¬Ö§³ÖÊı×ÖºÍ´óĞ´×ÖÄ¸×éºÏÒÔ¼°ºº×ÖµÈ
-//path:´ÅÅÌºÅ+Ãû×Ö£¬±ÈÈç"0:ALIENTEK"¡¢"1:OPENEDV"
+//è®¾ç½®ç›˜ç¬¦ï¼ˆç£ç›˜åå­—ï¼‰ï¼Œæœ€é•¿11ä¸ªå­—ç¬¦ï¼ï¼ï¼Œæ”¯æŒæ•°å­—å’Œå¤§å†™å­—æ¯ç»„åˆä»¥åŠæ±‰å­—ç­‰
+//path:ç£ç›˜å·+åå­—ï¼Œæ¯”å¦‚"0:ALIENTEK"ã€"1:OPENEDV"
 void exf_setlabel(uint8_t *path)
 {
     uint8_t res;
     res=f_setlabel ((const TCHAR *)path);
     if(res==FR_OK)
     {
-        printf("\r\n´ÅÅÌÅÌ·ûÉèÖÃ³É¹¦:%s\r\n",path);
-    }else printf("\r\n´ÅÅÌÅÌ·ûÉèÖÃÊ§°Ü£¬´íÎóÂë:%X\r\n",res);
+        Printf("\r\nç£ç›˜ç›˜ç¬¦è®¾ç½®æˆåŠŸ:%s\r\n",path);
+    }else Printf("\r\nç£ç›˜ç›˜ç¬¦è®¾ç½®å¤±è´¥ï¼Œé”™è¯¯ç :%X\r\n",res);
 }
 #endif

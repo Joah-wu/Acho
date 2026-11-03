@@ -8,6 +8,8 @@
 #include "i2s.h"
 #include "stdio.h"
 #include "../simple_gpio.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 
 
@@ -35,7 +37,7 @@ volatile uint8_t audio_rec_state = AUDIO_NONE;
 
 volatile __WaveHeader WAV_Header;  //The file head of WAV file
 volatile uint32_t RecDataSize;
-volatile uint32_t WriteSize;       //The byte numbers of writing to file every time.
+volatile UINT WriteSize;            //The byte numbers of writing to file every time.
 
 
 
@@ -49,7 +51,7 @@ volatile uint32_t WriteSize;       //The byte numbers of writing to file every t
 uint8_t Get_WAV_Message(char* fname, wavctrl* wavx) {
 
   uint8_t res = 0;
-  uint32_t br = 0;
+  UINT br = 0;
 
   ChunkRIFF *riff;
   ChunkFMT *fmt;
@@ -304,15 +306,27 @@ void IIS_ModeModify(uint32_t mode){
 extern SD_HandleTypeDef hsd;
 uint8_t PlayWaveFile(char *pname){
   uint8_t res;
+  taskENTER_CRITICAL();
   if (audio_play_request != AUDIO_PLAY){
 //    audio_play_request = AUDIO_NONE;
+    taskEXIT_CRITICAL();
     return 0xff;
   }
+  /* Claim the queued path before initialization so the GUI can distinguish
+     an active startup from a PLAY request that has not started yet. */
+  audio_play_state = AUDIO_PRE_PLAY;
+  taskEXIT_CRITICAL();
   HAL_Delay(1000);
+  if (audio_play_request == AUDIO_CANCEL) {
+    audio_play_state = AUDIO_CANCEL;
+    audio_play_request = AUDIO_NONE;
+    return 0xff;
+  }
   res = WM89060_Init(WM8960_MODE_DAC_ENABLE);
   res += Get_WAV_Message(pname,&WaveCtrlData);    //Get the messages of the WAV file
   if(res != 0){
     f_close(&WAV_File);
+    audio_play_state = AUDIO_NONE;
     audio_play_request = AUDIO_NONE;
     return res;
   }

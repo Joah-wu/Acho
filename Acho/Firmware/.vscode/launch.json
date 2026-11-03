@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug: Download and Debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/Firmware.elf",
+            "servertype": "openocd",
+            "configFiles": [
+                "${workspaceFolder}/DapLink.cfg"
+            ],
+            "serverpath": "/usr/bin/openocd",
+            "searchDir": [
+                "/usr/share/openocd/scripts"
+            ],
+            "gdbPath": "/home/joahwu/.local/share/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-gdb",
+            "runToEntryPoint": "main"
+        },
+        {
+            "name": "Release: Download Only",
+            "type": "node-terminal",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "command": "pkill openocd || true; exec /usr/bin/openocd -s /usr/share/openocd/scripts -f ./DapLink.cfg -c \"program build/Release/Firmware.elf verify reset exit\""
+        }
+    ]
+}

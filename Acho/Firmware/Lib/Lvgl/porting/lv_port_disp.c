@@ -26,6 +26,7 @@
 static void disp_init(void);
 
 static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
+static void disp_flush_done(void *context);
 //static void gpu_fill(lv_disp_drv_t * disp_drv, lv_color_t * dest_buf, lv_coord_t dest_width,
 //        const lv_area_t * fill_area, lv_color_t color);
 
@@ -150,24 +151,32 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
             /*Put a pixel to the display. For example:*/
             /*put_px(x, y, *color_p)*/
 
-          mlcd_DrawPixel(x,y,color_p->ch.blue<<2|color_p->ch.green<<1|color_p->ch.red);
+            mlcd_DrawPixel((uint8_t)x, (uint8_t)y,
+                           color_p->full ? White : Black);
             color_p++;
-//            if(color_p->full==0)
-//            {
-//                printf("ok");
-//            }
+
         }
     }
-//		if(disp_drv->draw_buf->flushing_last)//Custom_EPD_FillColor(area->x1,area->y1,area->x2,area->y2,BlackImage);
-//      mlcd_fill(0);
-      mlcd_Refresh();
+	// if(disp_drv->draw_buf->flushing_last)
+    /* Keep accumulating partial areas in the MLCD frame buffer.  Start one
+     * DMA transfer only after LVGL has submitted the last area. */
+    if (!lv_disp_flush_is_last(disp_drv)) {
+        lv_disp_flush_ready(disp_drv);
+        return;
+    }
+
+    if (mlcd_RefreshDMA(disp_flush_done, disp_drv) != HAL_OK) {
+        lv_disp_flush_ready(disp_drv);
+    }
 		
 		//printf("x1:%d	y1:%d \nx2:%d	y2:%d \n",area->x1,area->y1,area->x2,area->y2);
 		
-    /*IMPORTANT!!!
-     *Inform the graphics library that you are ready with the flushing*/
-    lv_disp_flush_ready(disp_drv);
 //		HAL_ResumeTick();
+}
+
+static void disp_flush_done(void *context)
+{
+    lv_disp_flush_ready((lv_disp_drv_t *)context);
 }
 
 /*OPTIONAL: GPU INTERFACE*/

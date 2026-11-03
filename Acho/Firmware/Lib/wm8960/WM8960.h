@@ -1,7 +1,7 @@
 #ifndef __WM8960_H__
 #define __WM8960_H__
 
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 #include "simple_gpio.h"
 #define IIC_SCL    PBout(8) //SCL
 #define IIC_SDA    PBout(9) //SDA

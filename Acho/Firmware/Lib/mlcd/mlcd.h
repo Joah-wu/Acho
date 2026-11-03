@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "main.h"
 
-/// MUST USE SPI LSB
+/* LS013B7DH06 is a 128x128, 3-bit RGB Sharp Memory LCD. */
 
 #define DISP_DISPLAY_GPIO_Port MLCD_DISP_GPIO_Port
 #define DISP_DISPLAY_Pin MLCD_DISP_Pin
@@ -18,6 +18,7 @@
 
 #define LCD_HEIGHT  128
 #define LCD_WIDTH   128
+#define LCD_BYTES_PER_LINE (LCD_WIDTH * 3U / 8U)
 
 #define BIT_WRITECMD (0x01)
 #define BIT_VCOM      (0x02)
@@ -40,9 +41,13 @@ typedef struct {
   uint8_t *Buffer;
 } MLCD;
 
+typedef void (*MLCD_RefreshDoneCallback)(void *context);
+
 void mlcd_Init(void);
 void mlcd_Clear(void);
 void mlcd_Refresh(void);
+HAL_StatusTypeDef mlcd_RefreshDMA(MLCD_RefreshDoneCallback callback, void *context);
+void mlcd_Service(void);
 void mlcd_DrawPixel(uint8_t x, uint8_t y, LCD_COLOR color);
 void mlcd_fill(uint8_t color);
 #endif

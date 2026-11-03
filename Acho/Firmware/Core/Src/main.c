@@ -22,6 +22,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
+#include "dma.h"
 #include "fatfs.h"
 #include "i2c.h"
 #include "i2s.h"
@@ -29,15 +30,16 @@
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
-#include "usb_host.h"
+#include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "../../User/fops.h"
+#include "fops.h"
 #include "ff.h"
-#include "../../User/bsp_delay.h"
+#include "bsp_delay.h"
 #include "lvgl.h"
+#include "bsp_usart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,23 +103,23 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
-  MX_SPI1_Init();
-  MX_USART1_UART_Init();
-  MX_USART2_UART_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
   MX_I2S2_Init();
   MX_SDIO_SD_Init();
+  MX_SPI1_Init();
   MX_TIM2_Init();
-  MX_FATFS_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
+  MX_USART1_UART_Init();
+  MX_USART2_UART_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
-    delay_init();
-    printf("%d",f_mount(&SDFatFS,SDPath,0));
-    exf_showfree((uint8_t*)"0:");
-    delay_ms(1000);
+  delay_init();
+  delay_ms(1000);
+
   /* USER CODE END 2 */
 
   /* Init scheduler */

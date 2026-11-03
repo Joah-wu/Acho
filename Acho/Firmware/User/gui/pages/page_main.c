@@ -34,9 +34,9 @@ static void click_event(lv_event_t *e) {
             downLoadFileList(IMG, NULL, NULL);
         } else if (memcmp(target->text, LV_SYMBOL_USB, 3) == 0) {
             while (HAL_SD_GetState(&hsd) == HAL_SD_STATE_BUSY);
-            HAL_GPIO_WritePin(USB_EN_GPIO_Port, USB_EN_Pin, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(USB_ENABLE_GPIO_Port, USB_ENABLE_Pin, GPIO_PIN_SET);
             HAL_Delay(50);
-            HAL_GPIO_WritePin(USB_EN_GPIO_Port, USB_EN_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(USB_ENABLE_GPIO_Port, USB_ENABLE_Pin, GPIO_PIN_RESET);
         } else if (memcmp(target->text, LV_SYMBOL_SETTINGS, 3) == 0) {
             setup_ui(&ui_bind,&ui_main,NULL);
         } else if (memcmp(target->text, "["LV_SYMBOL_CLOSE"]", 3) == 0) {

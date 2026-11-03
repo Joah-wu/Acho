@@ -15,7 +15,7 @@ static void fileDownload(char *payload, uint16_t size, void *des_path) {
     UINT count=0;
     if (size > 0) {
         if(HandlerManager.need_reset==0){
-            if(file->fs==0){
+            if(file->obj.fs==0){
                 res = f_open(file, (const TCHAR *) des_path, FA_CREATE_ALWAYS | FA_WRITE);
                 if (res)return;
             }
@@ -131,7 +131,7 @@ FILE_Info_StateTypedef loadNextFileData(FIL *file_ptr, File_InfoTypedef *file_in
         } else{
             stack_buff[stack_index++] = global_buff512[buff_index++];
         }
-        if(++file_index>file_ptr->fsize&& f_eof(file_ptr)){
+        if(++file_index>f_size(file_ptr)&& f_eof(file_ptr)){
             sector_flag = last_sector_flag = buff_index = file_index = 0;
             return FILE_INFO_END;
         }

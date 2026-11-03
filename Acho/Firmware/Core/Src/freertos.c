@@ -20,8 +20,6 @@
 #include "lv_port_fs.h"
 #include "lv_port_indev.h"
 #include "bsp_key.h"
-#include "usbd_def.h"
-#include "usbd_core.h"
 #include "sdio.h"
 #include "ff.h"
 #include "fatfs.h"
@@ -31,6 +29,7 @@
 #include "bsp_usart.h"
 #include "pages/page_audio.h"
 #include "WM8960Apps.h"
+#include "mlcd.h"
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -47,7 +46,7 @@
 /* Private typedef -----------------------------------------------------------*/
 typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN PTD */
-extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim3;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -66,9 +65,14 @@ extern TIM_HandleTypeDef htim4;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
+uint32_t defaultTaskBuffer[ 128 ];
+osStaticThreadDef_t defaultTaskControlBlock;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .cb_mem = &defaultTaskControlBlock,
+  .cb_size = sizeof(defaultTaskControlBlock),
+  .stack_mem = &defaultTaskBuffer[0],
+  .stack_size = sizeof(defaultTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for GUITask */
@@ -95,29 +99,29 @@ const osThreadAttr_t audioTask_attributes = {
   .stack_size = sizeof(audioTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal1,
 };
-/* Definitions for dataTransferTas */
-osThreadId_t dataTransferTasHandle;
-uint32_t dataTransferTasBuffer[ 1024 ];
-osStaticThreadDef_t dataTransferTasControlBlock;
-const osThreadAttr_t dataTransferTas_attributes = {
-  .name = "dataTransferTas",
-  .cb_mem = &dataTransferTasControlBlock,
-  .cb_size = sizeof(dataTransferTasControlBlock),
-  .stack_mem = &dataTransferTasBuffer[0],
-  .stack_size = sizeof(dataTransferTasBuffer),
+/* Definitions for transferTask */
+osThreadId_t transferTaskHandle;
+uint32_t transferTaskBuffer[ 1024 ];
+osStaticThreadDef_t transferTaskControlBlock;
+const osThreadAttr_t transferTask_attributes = {
+  .name = "transferTask",
+  .cb_mem = &transferTaskControlBlock,
+  .cb_size = sizeof(transferTaskControlBlock),
+  .stack_mem = &transferTaskBuffer[0],
+  .stack_size = sizeof(transferTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal2,
 };
-/* Definitions for syscheckTask */
-osThreadId_t syscheckTaskHandle;
-uint32_t syscheckTaskBuffer[ 512 ];
-osStaticThreadDef_t syscheckTaskControlBlock;
-const osThreadAttr_t syscheckTask_attributes = {
-  .name = "syscheckTask",
-  .cb_mem = &syscheckTaskControlBlock,
-  .cb_size = sizeof(syscheckTaskControlBlock),
-  .stack_mem = &syscheckTaskBuffer[0],
-  .stack_size = sizeof(syscheckTaskBuffer),
-  .priority = (osPriority_t) osPriorityNormal3,
+/* Definitions for sysCheckTask */
+osThreadId_t sysCheckTaskHandle;
+uint32_t sysCheckTaskBuffer[ 512 ];
+osStaticThreadDef_t sysCheckTaskControlBlock;
+const osThreadAttr_t sysCheckTask_attributes = {
+  .name = "sysCheckTask",
+  .cb_mem = &sysCheckTaskControlBlock,
+  .cb_size = sizeof(sysCheckTaskControlBlock),
+  .stack_mem = &sysCheckTaskBuffer[0],
+  .stack_size = sizeof(sysCheckTaskBuffer),
+  .priority = (osPriority_t) osPriorityLow,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -128,10 +132,10 @@ const osThreadAttr_t syscheckTask_attributes = {
 void StartDefaultTask(void *argument);
 void StartGUITask(void *argument);
 void StartAudioTask(void *argument);
-void StartDataTransferTask(void *argument);
-void StartSyscheckTask(void *argument);
+void StartTransferTask(void *argument);
+void StartSysCheckTask(void *argument);
 
-extern void MX_USB_HOST_Init(void);
+extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /**
@@ -170,14 +174,18 @@ void MX_FREERTOS_Init(void) {
   /* creation of audioTask */
   audioTaskHandle = osThreadNew(StartAudioTask, NULL, &audioTask_attributes);
 
-  /* creation of dataTransferTas */
-  dataTransferTasHandle = osThreadNew(StartDataTransferTask, NULL, &dataTransferTas_attributes);
+  /* creation of transferTask */
+  transferTaskHandle = osThreadNew(StartTransferTask, NULL, &transferTask_attributes);
 
-  /* creation of syscheckTask */
-  syscheckTaskHandle = osThreadNew(StartSyscheckTask, NULL, &syscheckTask_attributes);
+  /* creation of sysCheckTask */
+  sysCheckTaskHandle = osThreadNew(StartSysCheckTask, NULL, &sysCheckTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-    vTaskSuspend(mainTaskHandle);
+  vTaskSuspend(GUITaskHandle);
+  vTaskSuspend(audioTaskHandle);
+  vTaskSuspend(transferTaskHandle);
+  vTaskSuspend(sysCheckTaskHandle);
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -195,28 +203,26 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
-  /* init code for USB_HOST */
-  MX_USB_HOST_Init();
+  /* init code for USB_DEVICE */
+  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN StartDefaultTask */
     static portTickType PreviousWakeTime;
-    const portTickType TimeIncrement = pdMS_TO_TICKS(5);
+    const portTickType TimeIncrement = pdMS_TO_TICKS(1000);
     PreviousWakeTime = xTaskGetTickCount();
     lv_init();
     lv_port_disp_init();
     lv_port_indev_init();
     lv_port_fs_init();
     GUIInit();
-    HAL_TIM_Encoder_Start(&htim4,TIM_CHANNEL_ALL);
-    vTaskResume(mainTaskHandle);
-    HAL_GPIO_WritePin(USB_EN_GPIO_Port, USB_EN_Pin, GPIO_PIN_SET);
+    HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
+    // HAL_GPIO_WritePin(USB_ENABLE_GPIO_Port, USB_ENABLE_Pin, GPIO_PIN_SET);
+    vTaskResume(GUITaskHandle);
+    // vTaskResume(audioTaskHandle);
+    // vTaskResume(transferTaskHandle);
+    // vTaskResume(sysCheckTaskHandle);
     /* Infinite loop */
     for (;;) {
-//        if(audio_play_state==AUDIO_PLAY){
-//            vTaskDelay(100);
-//            audio_play((uint8_t *) global_BUFF, &audio_play_state);
-//        }
-        USART1_REC_Handler();
-        PlayWaveFile(global_BUFF);
+  
         vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
     }
   /* USER CODE END StartDefaultTask */
@@ -232,10 +238,23 @@ void StartDefaultTask(void *argument)
 void StartGUITask(void *argument)
 {
   /* USER CODE BEGIN StartGUITask */
+  static portTickType PreviousWakeTime;
+  const portTickType TimeIncrement = pdMS_TO_TICKS(5);
+  FRESULT mount_result;
+  PreviousWakeTime = xTaskGetTickCount();
+
+  mount_result = f_mount(&SDFatFS, SDPath, 1);
+  Printf("SD mount: %s (%d)\r\n",
+         (mount_result == FR_OK) ? "OK" : "failed",
+         (int)mount_result);
+  exf_showfree((uint8_t*)"0:");
+  setup_ui(&ui_main, &ui_ROOT, NULL);
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    lv_task_handler();
+    mlcd_Service();
+    vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
   }
   /* USER CODE END StartGUITask */
 }
@@ -251,49 +270,50 @@ void StartAudioTask(void *argument)
 {
   /* USER CODE BEGIN StartAudioTask */
   static portTickType PreviousWakeTime;
-  const portTickType TimeIncrement = pdMS_TO_TICKS(5);
+  const portTickType TimeIncrement = pdMS_TO_TICKS(100);
   PreviousWakeTime = xTaskGetTickCount();
-  setup_ui(&ui_main, &ui_ROOT, NULL);
+  
   /* Infinite loop */
   for(;;)
   {
-    lv_task_handler();
+    PlayWaveFile(global_BUFF);
     vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
   }
   /* USER CODE END StartAudioTask */
 }
 
-/* USER CODE BEGIN Header_StartDataTransferTask */
+/* USER CODE BEGIN Header_StartTransferTask */
 /**
-* @brief Function implementing the dataTransferTas thread.
+* @brief Function implementing the TransferTask thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartDataTransferTask */
-void StartDataTransferTask(void *argument)
+/* USER CODE END Header_StartTransferTask */
+void StartTransferTask(void *argument)
 {
-  /* USER CODE BEGIN StartDataTransferTask */
+  /* USER CODE BEGIN StartTransferTask */
   static portTickType PreviousWakeTime;
   const portTickType TimeIncrement = pdMS_TO_TICKS(100);
   PreviousWakeTime = xTaskGetTickCount();
   /* Infinite loop */
   for(;;)
   {
+    USART1_REC_Handler();
     vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
   }
-  /* USER CODE END StartDataTransferTask */
+  /* USER CODE END StartTransferTask */
 }
 
-/* USER CODE BEGIN Header_StartSyscheckTask */
+/* USER CODE BEGIN Header_StartSysCheckTask */
 /**
-* @brief Function implementing the syscheckTask thread.
+* @brief Function implementing the sysCheckTask thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartSyscheckTask */
-void StartSyscheckTask(void *argument)
+/* USER CODE END Header_StartSysCheckTask */
+void StartSysCheckTask(void *argument)
 {
-  /* USER CODE BEGIN StartSyscheckTask */
+  /* USER CODE BEGIN StartSysCheckTask */
   static portTickType PreviousWakeTime;
   const portTickType TimeIncrement = pdMS_TO_TICKS(100);
   PreviousWakeTime = xTaskGetTickCount();
@@ -302,9 +322,11 @@ void StartSyscheckTask(void *argument)
   {
     vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
   }
-  /* USER CODE END StartSyscheckTask */
+  /* USER CODE END StartSysCheckTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
+/* USER CODE END Application */
 

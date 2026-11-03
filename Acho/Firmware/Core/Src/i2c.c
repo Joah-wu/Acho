@@ -101,7 +101,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     PB7     ------> I2C1_SDA
     PB8     ------> I2C1_SCL
     */
-    GPIO_InitStruct.Pin = WM8960_I2C_SDA_Pin|WM8950_I2C_SCL_Pin;
+    GPIO_InitStruct.Pin = WM8960_I2C_SDA_Pin|WM8960_I2C_SCL_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -125,7 +125,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     PB10     ------> I2C2_SCL
     PB3     ------> I2C2_SDA
     */
-    GPIO_InitStruct.Pin = STD25_I2C_SCL_Pin|GPIO_PIN_3;
+    GPIO_InitStruct.Pin = ST25D_I2C_SCL_Pin|ST25D_I2C_SDA_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -157,7 +157,7 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
     */
     HAL_GPIO_DeInit(WM8960_I2C_SDA_GPIO_Port, WM8960_I2C_SDA_Pin);
 
-    HAL_GPIO_DeInit(WM8950_I2C_SCL_GPIO_Port, WM8950_I2C_SCL_Pin);
+    HAL_GPIO_DeInit(WM8960_I2C_SCL_GPIO_Port, WM8960_I2C_SCL_Pin);
 
   /* USER CODE BEGIN I2C1_MspDeInit 1 */
 
@@ -175,9 +175,9 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
     PB10     ------> I2C2_SCL
     PB3     ------> I2C2_SDA
     */
-    HAL_GPIO_DeInit(STD25_I2C_SCL_GPIO_Port, STD25_I2C_SCL_Pin);
+    HAL_GPIO_DeInit(ST25D_I2C_SCL_GPIO_Port, ST25D_I2C_SCL_Pin);
 
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_3);
+    HAL_GPIO_DeInit(ST25D_I2C_SDA_GPIO_Port, ST25D_I2C_SDA_Pin);
 
   /* USER CODE BEGIN I2C2_MspDeInit 1 */
 

@@ -13,13 +13,10 @@
 #include "lvgl.h"
 #include "ff.h"			/* Declarations of FatFs API */
 #include "stdio.h"
+#include "string.h"
 /*********************
  *      DEFINES
  *********************/
-static FIL lv_file;
-static DIR lv_dir;
-#define LV_FILE (&lv_file)
-#define LV_DIR (&lv_dir)
 /**********************
  *      TYPEDEFS
  **********************/
@@ -110,26 +107,32 @@ static void fs_init(void)
 static void * fs_open (lv_fs_drv_t * drv, const char * path, lv_fs_mode_t mode)
 {
     lv_fs_res_t res = LV_FS_RES_NOT_IMP;
-    void * f = NULL;
+    FIL * file = lv_mem_alloc(sizeof(*file));
+
+    if(file == NULL) return NULL;
 
     if(mode == LV_FS_MODE_WR)
     {
         /*Open a file for write*/
-       res = f_open(LV_FILE,path,FA_WRITE|FA_CREATE_ALWAYS);         /*Add your code here*/
+       res = f_open(file, path, FA_WRITE | FA_CREATE_ALWAYS);
     }
     else if(mode == LV_FS_MODE_RD)
     {
         /*Open a file for read*/
-       res = f_open(LV_FILE,path,FA_READ);         /*Add your code here*/
+       res = f_open(file, path, FA_READ);
     }
     else if(mode == (LV_FS_MODE_WR | LV_FS_MODE_RD))
     {
         /*Open a file for read and write*/
-       res = f_open(LV_FILE,path,FA_WRITE|FA_READ|FA_CREATE_ALWAYS);         /*Add your code here*/
+       res = f_open(file, path, FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
     }
-		if(res == FR_OK)
-			f = LV_FILE;
-    return f;
+
+    if(res != FR_OK) {
+        lv_mem_free(file);
+        return NULL;
+    }
+
+    return file;
 }
 
 /**
@@ -140,14 +143,11 @@ static void * fs_open (lv_fs_drv_t * drv, const char * path, lv_fs_mode_t mode)
  */
 static lv_fs_res_t fs_close (lv_fs_drv_t * drv, void * file_p)
 {
-    lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+    if(file_p == NULL) return LV_FS_RES_INV_PARAM;
 
-    /*Add your code here*/
-		if(f_close((FIL *)file_p)!=0)
-			res = LV_FS_RES_UNKNOWN;
-		else
-			res = LV_FS_RES_OK;
-    return res;
+    FRESULT result = f_close((FIL *)file_p);
+    lv_mem_free(file_p);
+    return (result == FR_OK) ? LV_FS_RES_OK : LV_FS_RES_UNKNOWN;
 }
 
 /**
@@ -162,12 +162,17 @@ static lv_fs_res_t fs_close (lv_fs_drv_t * drv, void * file_p)
 static lv_fs_res_t fs_read (lv_fs_drv_t * drv, void * file_p, void * buf, uint32_t btr, uint32_t * br)
 {
     lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+    UINT bytes_read = 0;
 
     /*Add your code here*/
-		if(f_read((FIL *)file_p,buf,btr,br)!=0)
+		if(f_read((FIL *)file_p, buf, (UINT)btr, &bytes_read) != FR_OK)
 			res = LV_FS_RES_UNKNOWN;
 		else
+		{
+			if(br != NULL)
+				*br = bytes_read;
 			res = LV_FS_RES_OK;
+		}
     return res;
 }
 
@@ -183,12 +188,17 @@ static lv_fs_res_t fs_read (lv_fs_drv_t * drv, void * file_p, void * buf, uint32
 static lv_fs_res_t fs_write(lv_fs_drv_t * drv, void * file_p, const void * buf, uint32_t btw, uint32_t * bw)
 {
     lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+    UINT bytes_written = 0;
 
     /*Add your code here*/
-    if(f_write((FIL *)file_p,buf,btw,bw)!=0)
+		if(f_write((FIL *)file_p, buf, (UINT)btw, &bytes_written) != FR_OK)
 			res = LV_FS_RES_UNKNOWN;
 		else
+		{
+			if(bw != NULL)
+				*bw = bytes_written;
 			res = LV_FS_RES_OK;
+		}
     return res;
 }
 
@@ -211,7 +221,7 @@ static lv_fs_res_t fs_seek (lv_fs_drv_t * drv, void * file_p, uint32_t pos, lv_f
 		if(whence == LV_FS_SEEK_CUR)
 			pos+=((FIL *)file_p)->fptr;
 		else if(whence == LV_FS_SEEK_END)
-			pos=((FIL *)file_p)->fsize - pos;
+			pos=f_size((FIL *)file_p) - pos;
 		if(f_lseek((FIL *)file_p,pos)!=0)
 			res = LV_FS_RES_UNKNOWN;
 		else
@@ -252,10 +262,14 @@ static lv_fs_res_t fs_tell (lv_fs_drv_t * drv, void * file_p, uint32_t * pos_p)
  */
 static void * fs_dir_open (lv_fs_drv_t * drv, const char *path)
 {
-    void * dir = NULL;
-    /*Add your code here*/
-    if(f_opendir(LV_DIR,path) == FR_OK)          /*Add your code here*/
-			dir = LV_DIR;
+    DIR * dir = lv_mem_alloc(sizeof(*dir));
+
+    if(dir == NULL) return NULL;
+    if(f_opendir(dir, path) != FR_OK) {
+        lv_mem_free(dir);
+        return NULL;
+    }
+
     return dir;
 }
 
@@ -273,13 +287,24 @@ static lv_fs_res_t fs_dir_read (lv_fs_drv_t * drv, void * rddir_p, char *fn)
 		FILINFO fno;
 		memset(&fno,0,sizeof(FILINFO));
     /*Add your code here*/
-		if(f_findnext((DIR *)rddir_p,&fno)!=0)
+		/* _USE_FIND is disabled in this FatFs configuration; iterate with
+		 * the standard directory-read API instead. */
+		if(f_readdir((DIR *)rddir_p, &fno) != FR_OK)
 		{
-			memcpy(fn,fno.lfname,fno.lfsize);
 			res = LV_FS_RES_UNKNOWN;
 		}
 		else
+		{
+			if(fno.fname[0] == '\0')
+			{
+				fn[0] = '\0';
+			}
+			else
+			{
+				strcpy(fn, fno.fname);
+			}
 			res = LV_FS_RES_OK;
+		}
     return res;
 }
 
@@ -291,14 +316,11 @@ static lv_fs_res_t fs_dir_read (lv_fs_drv_t * drv, void * rddir_p, char *fn)
  */
 static lv_fs_res_t fs_dir_close (lv_fs_drv_t * drv, void * rddir_p)
 {
-    lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+    if(rddir_p == NULL) return LV_FS_RES_INV_PARAM;
 
-    /*Add your code here*/
-		if(f_closedir((DIR *)rddir_p)!=0)
-			res = LV_FS_RES_UNKNOWN;
-		else
-			res = LV_FS_RES_OK;
-    return res;
+    FRESULT result = f_closedir((DIR *)rddir_p);
+    lv_mem_free(rddir_p);
+    return (result == FR_OK) ? LV_FS_RES_OK : LV_FS_RES_UNKNOWN;
 }
 
 #else /*Enable this file at the top*/

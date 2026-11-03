@@ -1,6 +1,6 @@
 #ifndef __SIMPLE_GPIO_H
 #define __SIMPLE_GPIO_H	
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 																	    
 	 
 //位带操作,实现51类似的GPIO控制功能

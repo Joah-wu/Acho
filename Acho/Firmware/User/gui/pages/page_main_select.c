@@ -7,11 +7,18 @@
 #include "page_filelist.h"
 #include "page_audio.h"
 #include "page_play.h"
-extern lv_indev_t *indev_encoder;
+#include <stdio.h>
+#include <string.h>
 
 static void setup_screen(void *user_data);
 
 static void resume_screen(void *user_data);
+
+static lv_obj_t *preview_img;
+static bool preview_exit_active;
+static const char *pending_preview_mode;
+
+#define PREVIEW_HOME_Y  (-5)
 
 lv_ui ui_main_select = {
         .screen=NULL,
@@ -24,32 +31,93 @@ lv_ui ui_main_select = {
 };
 
 static void custom_anim_callback(void *obj, int32_t value) {
-    char buff[50] = {0};
+    char buff[64];
     lv_obj_t *target = obj;
-    if (memcmp(target->user_data, "Audio", 6) == 0) {
-        snprintf(buff, 50, "P:Static\\Animation\\main-selection\\music\\%ld.bin", value);
+    const char *mode_str = lv_obj_get_user_data(target);
+
+    if (mode_str == NULL) return;
+
+    if (strcmp(mode_str, "Audio") == 0) {
+        snprintf(buff, sizeof(buff), "P:Static\\Animation\\main-selection\\music\\%ld.bin", (long)value);
         lv_img_set_src(target, buff);
-    } else if (memcmp(target->user_data, "Photo", 6) == 0) {
-        snprintf(buff, 50, "P:Static\\Animation\\main-selection\\photo\\%ld.bin", value);
+    } else if (strcmp(mode_str, "Photo") == 0) {
+        snprintf(buff, sizeof(buff), "P:Static\\Animation\\main-selection\\photo\\%ld.bin", (long)value);
         lv_img_set_src(target, buff);
     }
 }
 
-static void animation_end_callback(struct _lv_anim_t *anim) {
-    lv_obj_t * img_front,*img_pre=NULL;
-    lv_obj_t * img_div = lv_obj_get_child(lv_obj_get_child(ui_main_select.screen,0),1);
-    img_front = lv_obj_get_child(img_div,0);
-    img_pre = lv_obj_get_child(img_div,1);
-    lv_obj_set_style_img_opa(img_front, LV_OPA_100, LV_PART_MAIN);
-    lv_obj_set_style_img_opa(img_pre, LV_OPA_0, LV_PART_MAIN);
+static void preview_start_enter(const char *mode_str)
+{
+    lv_anim_t anim_icon;
+
+    if(preview_img == NULL) return;
+
+    lv_anim_del(preview_img, NULL);
+    lv_obj_set_user_data(preview_img, (void *)mode_str);
+    lv_obj_set_y(preview_img, PREVIEW_HOME_Y);
+    lv_obj_set_style_img_opa(preview_img, LV_OPA_100, LV_PART_MAIN);
+
+    lv_anim_init(&anim_icon);
+    lv_anim_set_var(&anim_icon, preview_img);
+    lv_anim_set_exec_cb(&anim_icon, custom_anim_callback);
+    lv_anim_set_time(&anim_icon, 400);
+    lv_anim_set_delay(&anim_icon, 100);
+    if(strcmp(mode_str, "Audio") == 0) {
+        lv_anim_set_values(&anim_icon, 1, 9);
+    } else if(strcmp(mode_str, "Photo") == 0) {
+        lv_anim_set_values(&anim_icon, 1, 15);
+    }
+    lv_anim_start(&anim_icon);
+}
+
+static void preview_start_pending(void *user_data)
+{
+    const char *mode_str = pending_preview_mode;
+    LV_UNUSED(user_data);
+
+    pending_preview_mode = NULL;
+    if(mode_str != NULL) preview_start_enter(mode_str);
+}
+
+static void preview_exit_ready_callback(struct _lv_anim_t *anim)
+{
+    LV_UNUSED(anim);
+
+    preview_exit_active = false;
+    if(pending_preview_mode != NULL) {
+        lv_async_call(preview_start_pending, NULL);
+    }
+}
+
+static void preview_start_exit(const char *mode_str)
+{
+    lv_anim_t anim_icon;
+
+    if(preview_img == NULL || preview_exit_active) return;
+
+    preview_exit_active = true;
+    lv_anim_del(preview_img, NULL);
+    lv_obj_set_user_data(preview_img, (void *)mode_str);
+
+    lv_anim_init(&anim_icon);
+    lv_anim_set_var(&anim_icon, preview_img);
+    lv_anim_set_exec_cb(&anim_icon, custom_anim_callback);
+    lv_anim_set_time(&anim_icon, 200);
+    if(strcmp(mode_str, "Audio") == 0) {
+        lv_anim_set_values(&anim_icon, 10, 13);
+    } else if(strcmp(mode_str, "Photo") == 0) {
+        lv_anim_set_values(&anim_icon, 16, 18);
+    }
+    lv_anim_set_ready_cb(&anim_icon, preview_exit_ready_callback);
+
+    lv_anim_start(&anim_icon);
 }
 
 static void click_event(lv_event_t *e) {
     lv_obj_t *label_div = (lv_obj_t *) lv_event_get_target(e);
     if (label_div) {
         lv_anim_t anim_mode_text;
-        lv_anim_t anim_icon;
-        char *mode_str = "";
+        const char *mode_str = "";
         lv_obj_t *mode_text = lv_obj_get_child(label_div, 0);
         if (mode_text)
             mode_str = lv_label_get_text(mode_text);
@@ -75,57 +143,37 @@ static void click_event(lv_event_t *e) {
 
             }
 
-        } else {
+        } else if(e->code == LV_EVENT_FOCUSED || e->code == LV_EVENT_DEFOCUSED) {
             lv_anim_init(&anim_mode_text);
             lv_anim_set_var(&anim_mode_text, label_div);
-            lv_anim_set_time(&anim_mode_text, 1000);
+            lv_anim_set_time(&anim_mode_text, 300);
             lv_anim_set_delay(&anim_mode_text, 0);
             lv_anim_set_exec_cb(&anim_mode_text, (lv_anim_exec_xcb_t) lv_obj_set_x);
-            lv_obj_t * img_front,*img_pre=NULL;
-            lv_obj_t * img_div = lv_obj_get_child(lv_obj_get_child(ui_main_select.screen,0),1);
-            img_front = lv_obj_get_child(img_div,0);
-            img_pre = lv_obj_get_child(img_div,1);
-            if (e->code == LV_EVENT_FOCUSED && indev_encoder->proc.state!=LV_INDEV_STATE_PR) {//  emerge
-                if (img_front) {
-                    lv_anim_init(&anim_icon);
-                    anim_icon.user_data = img_front;
-                    img_front->user_data = mode_str;
-                    lv_anim_set_var(&anim_icon, img_front);
-                    lv_anim_set_exec_cb(&anim_icon, (lv_anim_exec_xcb_t) custom_anim_callback);
-                    lv_anim_set_time(&anim_icon, 1500);
-                    lv_anim_set_delay(&anim_icon, 300);
-                }
-                if (memcmp(mode_str, "Audio", 6) == 0) {
+            if(preview_img == NULL) return;
+
+            if (e->code == LV_EVENT_FOCUSED) {
+                if (strcmp(mode_str, "Audio") == 0) {
                     lv_anim_set_values(&anim_mode_text, -128, 0);
-                    lv_anim_set_values(&anim_icon, 1, 10);
-                } else if (memcmp(mode_str, "Photo", 6) == 0) {
+                } else if (strcmp(mode_str, "Photo") == 0) {
                     lv_anim_set_values(&anim_mode_text, -128, 0);
-                    lv_anim_set_values(&anim_icon, 1, 15);
                 }
                 lv_anim_start(&anim_mode_text);
-                lv_anim_start(&anim_icon);
-            } else if (e->code == LV_EVENT_DEFOCUSED && indev_encoder->proc.state!=LV_INDEV_STATE_PR) {//  submerge
-                if (img_pre) {
-                    lv_obj_set_style_img_opa(img_front, LV_OPA_0, LV_PART_MAIN);
-                    lv_obj_set_style_img_opa(img_pre, LV_OPA_100, LV_PART_MAIN);
-                    lv_anim_init(&anim_icon);
-                    anim_icon.user_data = img_pre;
-                    img_pre->user_data = mode_str;
-                    lv_anim_set_var(&anim_icon, img_pre);
-                    lv_anim_set_exec_cb(&anim_icon, (lv_anim_exec_xcb_t) custom_anim_callback);
-                    lv_anim_set_ready_cb(&anim_icon, animation_end_callback);
-                    lv_anim_set_time(&anim_icon, 1500);
-                    lv_anim_set_delay(&anim_icon, 0);
+
+                /* LVGL emits FOCUSED immediately after DEFOCUSED.  Keep only
+                 * the latest requested preview until the exit is complete. */
+                if(preview_exit_active) {
+                    pending_preview_mode = mode_str;
+                } else {
+                    preview_start_enter(mode_str);
                 }
-                if (memcmp(mode_str, "Audio", 6) == 0) {
+            } else {
+                if (strcmp(mode_str, "Audio") == 0) {
                     lv_anim_set_values(&anim_mode_text, 0, 128);
-                    lv_anim_set_values(&anim_icon, 11, 14);
-                } else if (memcmp(mode_str, "Photo", 6) == 0) {
+                } else if (strcmp(mode_str, "Photo") == 0) {
                     lv_anim_set_values(&anim_mode_text, 0, 128);
-                    lv_anim_set_values(&anim_icon, 16, 18);
                 }
                 lv_anim_start(&anim_mode_text);
-                lv_anim_start(&anim_icon);
+                preview_start_exit(mode_str);
             }
         }
 
@@ -135,6 +183,8 @@ static void click_event(lv_event_t *e) {
 }
 
 static void setup_screen(void *user_data) {
+    preview_exit_active = false;
+    pending_preview_mode = NULL;
     ui_main_select.screen = lv_obj_create(NULL);
     lv_obj_set_user_data(ui_main_select.screen,user_data);
     lv_obj_set_scrollbar_mode(ui_main_select.screen,LV_SCROLLBAR_MODE_OFF);
@@ -175,15 +225,10 @@ static void setup_screen(void *user_data) {
     lv_obj_set_scrollbar_mode(img_div,LV_SCROLLBAR_MODE_OFF);
     lv_obj_align_to(img_div, title,LV_ALIGN_BOTTOM_MID,0,-5);
 
-    lv_obj_t * img_front = lv_img_create(img_div);
-    lv_obj_set_size(img_front, 64, 64);
-    lv_obj_align(img_front, LV_ALIGN_TOP_MID,0,-5);
-//    lv_obj_center(img_front);
-
-    lv_obj_t * img_pre = lv_img_create(img_div);
-    lv_obj_set_size(img_pre, 64, 64);
-    lv_obj_align(img_pre, LV_ALIGN_TOP_MID,0,5);
-//    lv_obj_center(img_pre);
+    preview_img = lv_img_create(img_div);
+    lv_obj_set_size(preview_img, 64, 64);
+    lv_obj_align(preview_img, LV_ALIGN_TOP_MID, 0, PREVIEW_HOME_Y);
+    lv_img_set_src(preview_img, "P:Static\\Animation\\main-selection\\music\\1.bin");
 
     const char *mode_text[] = {"Audio", "Photo"};
     for (int i = 0; i < 2; i++) {

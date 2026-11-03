@@ -4,7 +4,7 @@
 
 #ifndef WM8960_TEST_WM8960APPS_H
 #define WM8960_TEST_WM8960APPS_H
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 #include "fatfs.h"
 
 #define WAV_BUFFER_SIZE 5120

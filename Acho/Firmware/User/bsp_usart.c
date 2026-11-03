@@ -1,26 +1,26 @@
 //#include <string.h>
-#include "../bsp_usart.h"
+#include "bsp_usart.h"
 #include "stdarg.h"
 //
 //
 //_Bool Uart_Error_Flag = 0;
 //extern DMA_HandleTypeDef hdma_usart1_rx;
 //extern DMA_HandleTypeDef hdma_usart1_tx;
-char RxBuffer1[RXBUFFERSIZE];   //½ÓÊÕÊý¾Ý
+char RxBuffer1[RXBUFFERSIZE];   //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //__IO uint16_t Rec_Length1 = 0;
 //__IO _Bool Rec_Complete1 = 0;
 //
 //
-/////ÖØ¶¨Ïòc¿âº¯Êýprintfµ½´®¿Ú£¬ÖØ¶¨Ïòºó¿ÉÊ¹ÓÃprintfº¯Êý
+/////ï¿½Ø¶ï¿½ï¿½ï¿½cï¿½âº¯ï¿½ï¿½printfï¿½ï¿½ï¿½ï¿½ï¿½Ú£ï¿½ï¿½Ø¶ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½printfï¿½ï¿½ï¿½ï¿½
 //int fputc(int ch, FILE *f) {
 //    HAL_UART_Transmit(&huart1, (uint8_t *) &ch, 1, 0xffff);
 //    while (!(USART1->SR & UART_FLAG_TXE));
 //    return (ch);
 //}
 //
-/////ÖØ¶¨Ïòc¿âº¯Êýscanfµ½´®¿Ú£¬ÖØÐ´Ïòºó¿ÉÊ¹ÓÃscanf¡¢getcharµÈº¯Êý
+/////ï¿½Ø¶ï¿½ï¿½ï¿½cï¿½âº¯ï¿½ï¿½scanfï¿½ï¿½ï¿½ï¿½ï¿½Ú£ï¿½ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½scanfï¿½ï¿½getcharï¿½Èºï¿½ï¿½ï¿½
 //int fgetc(FILE *f) {
-//    /* µÈ´ý´®¿ÚÊäÈëÊý¾Ý */
+//    /* ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 //    uint8_t temp;
 //    HAL_UART_Receive(&huart1, &temp, 1, 0xffff);
 //    return temp;
@@ -32,7 +32,7 @@ char RxBuffer1[RXBUFFERSIZE];   //½ÓÊÕÊý¾Ý
 //}
 //
 ///**************************************************************************
-// * @brief  ´®¿Ú´íÎó»Øµ÷º¯Êý
+// * @brief  ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½
 // * @retval
 //**************************************************************************/
 //void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
@@ -59,7 +59,7 @@ char RxBuffer1[RXBUFFERSIZE];   //½ÓÊÕÊý¾Ý
 //        __HAL_UART_CLEAR_OREFLAG(huart);
 //    }
 //
-//    // ´íÎó±êÖ¾Î»ÖÃ
+//    // ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î»ï¿½ï¿½
 //    Uart_Error_Flag = 1;
 //}
 //
@@ -83,11 +83,11 @@ int Printf(char *formatString, ...) {
 //    while (HAL_DMA_GetState(&hdma_usart1_tx) == HAL_DMA_STATE_BUSY);
 //    if (huart1.gState != HAL_UART_STATE_READY)HAL_UART_Abort(&huart1);
 //    __HAL_DMA_DISABLE(&hdma_usart1_tx);
-//    if (HAL_UART_Transmit_DMA(&huart1, (uint8_t *) TXBuffer, length) != HAL_OK) //ÅÐ¶ÏÊÇ·ñ·¢ËÍÕý³££¬Èç¹û³öÏÖÒì³£Ôò½øÈëÒì³£ÖÐ¶Ïº¯Êý
+//    if (HAL_UART_Transmit_DMA(&huart1, (uint8_t *) TXBuffer, length) != HAL_OK) //ï¿½Ð¶ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£ï¿½Ð¶Ïºï¿½ï¿½ï¿½
 //    {
 //        //return;
 //    }
-//    while (__HAL_DMA_GET_COUNTER(&hdma_usart1_tx) != 0);//µÈ·¢ËÍÍê²ÅÄÜÇå
+//    while (__HAL_DMA_GET_COUNTER(&hdma_usart1_tx) != 0);//ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //    va_end(args);
 //    return length;
 //}
@@ -125,15 +125,15 @@ void USART1_IDLE_Handler(void) {
 //    uint16_t temp;
 //    if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) != RESET) {
 //        if (hdma_usart1_tx.State != HAL_DMA_STATE_BUSY && Rec_Complete1 == 0)
-//            //¼ì²âDMA·¢ËÍÊÇ·ñÍê³É£¬²»¼ÓÕâ¾äµÄ»°£¬µ±Êý¾ÝÁ÷½ø¿ÕÏÐÖÐ¶ÏÌ«Æµ·±£¬»áµ¼ÖÂDMAÌáÇ°½áÊøÒÔÖÂ·¢ËÍÖÐÖ¹¿¨×¡
+//            //ï¿½ï¿½ï¿½DMAï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½É£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½Ì«Æµï¿½ï¿½ï¿½ï¿½ï¿½áµ¼ï¿½ï¿½DMAï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½×¡
 //        {
 //            USART_DMARec_Stop(&huart1);
 //            temp = __HAL_DMA_GET_COUNTER(
-//                    &hdma_usart1_rx);// »ñÈ¡DMAÖÐÎ´´«ÊäµÄÊý¾Ý¸öÊý   //temp  = hdma_usart1_rx.Instance->NDTR;//¶ÁÈ¡NDTR¼Ä´æÆ÷ »ñÈ¡DMAÖÐÎ´´«ÊäµÄÊý¾Ý¸öÊý£¬
-//            Rec_Length1 = RXBUFFERSIZE - temp; //×Ü¼ÆÊý¼õÈ¥Î´´«ÊäµÄÊý¾Ý¸öÊý£¬µÃµ½ÒÑ¾­½ÓÊÕµÄÊý¾Ý¸öÊý
-//            Rec_Complete1 = 1;    // ½ÓÊÜÍê³É±êÖ¾Î»ÖÃ1
+//                    &hdma_usart1_rx);// ï¿½ï¿½È¡DMAï¿½ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¸ï¿½ï¿½ï¿½   //temp  = hdma_usart1_rx.Instance->NDTR;//ï¿½ï¿½È¡NDTRï¿½Ä´ï¿½ï¿½ï¿½ ï¿½ï¿½È¡DMAï¿½ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¸ï¿½ï¿½ï¿½ï¿½ï¿½
+//            Rec_Length1 = RXBUFFERSIZE - temp; //ï¿½Ü¼ï¿½ï¿½ï¿½ï¿½ï¿½È¥Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½Ý¸ï¿½ï¿½ï¿½
+//            Rec_Complete1 = 1;    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É±ï¿½Ö¾Î»ï¿½ï¿½1
 //        }
-//        __HAL_UART_CLEAR_IDLEFLAG(&huart1);//Çå³ý±êÖ¾Î»Òª·Å³öÀ´£¡£¡²»È»ÎÞ·¨Çå³ý±êÖ¾Î»µ¼ÖÂÒ»Ö±ÔÚÖÐ¶ÏhandlerËÀÑ­»·
+//        __HAL_UART_CLEAR_IDLEFLAG(&huart1);//ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î»Òªï¿½Å³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È»ï¿½Þ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î»ï¿½ï¿½ï¿½ï¿½Ò»Ö±ï¿½ï¿½ï¿½Ð¶ï¿½handlerï¿½ï¿½Ñ­ï¿½ï¿½
 //    }
 }
 //
@@ -184,24 +184,24 @@ UartHandler_DriverTypedef HandlerManager = {
 void USART1_REC_Handler(void) {
 //    static uint32_t time_begin = 0;
 //    static uint8_t flag = 0;
-//    if (Rec_Complete1 == 1)  //½ÓÊÕÍê³É±êÖ¾
+//    if (Rec_Complete1 == 1)  //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É±ï¿½Ö¾
 //    {
 //        __HAL_UART_DISABLE_IT(&huart1, UART_IT_IDLE);
 //        //======USART1_LOGIC_BEGIN======
-////        if (HAL_UART_Transmit_DMA(&huart1, (uint8_t *) RxBuffer1, Rec_Length1) != HAL_OK) //ÅÐ¶ÏÊÇ·ñ·¢ËÍÕý³££¬Èç¹û³öÏÖÒì³£Ôò½øÈëÒì³£ÖÐ¶Ïº¯Êý
+////        if (HAL_UART_Transmit_DMA(&huart1, (uint8_t *) RxBuffer1, Rec_Length1) != HAL_OK) //ï¿½Ð¶ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£ï¿½Ð¶Ïºï¿½ï¿½ï¿½
 ////        {
 ////            //return;
 ////        }
-////        while (__HAL_DMA_GET_COUNTER(&hdma_usart1_tx) != 0);//µÈ·¢ËÍÍê²ÅÄÜÇå
+////        while (__HAL_DMA_GET_COUNTER(&hdma_usart1_tx) != 0);//ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //        if (!HandlerManager.is_idle && HandlerManager.handler_function != NULL) {
 //            HandlerManager.handler_function(RxBuffer1, Rec_Length1, HandlerManager.handler_userdata);
 //            HandlerManager.is_idle = 1;//successful -> set is_idel to 1 !
 //        }
 //        //======USART1_LOGIC_END======
 //        memset(RxBuffer1, 0, Rec_Length1);
-//        Rec_Length1 = 0;//Çå³ý¼ÆÊý
-//        Rec_Complete1 = 0;//Çå³ý½ÓÊÕ½áÊø±êÖ¾Î»
-//        HAL_UART_Receive_DMA(&huart1, (uint8_t *) RxBuffer1, RXBUFFERSIZE);//ÖØÐÂ´ò¿ªDMA½ÓÊÕ
+//        Rec_Length1 = 0;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//        Rec_Complete1 = 0;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î»
+//        HAL_UART_Receive_DMA(&huart1, (uint8_t *) RxBuffer1, RXBUFFERSIZE);//ï¿½ï¿½ï¿½Â´ï¿½DMAï¿½ï¿½ï¿½ï¿½
 //        __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
 //    }
 //    switch (flag) {
