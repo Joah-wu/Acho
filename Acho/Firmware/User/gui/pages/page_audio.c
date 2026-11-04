@@ -244,6 +244,10 @@ static void TimerCallBack(lv_timer_t *timer){
         lv_label_set_text(btn, LV_SYMBOL_PAUSE);
     } else if(audio_play_state == AUDIO_PAUSE) {
         lv_label_set_text(btn, LV_SYMBOL_PLAY);
+    } else if(audio_play_state == AUDIO_NONE && audio_play_request == AUDIO_NONE &&
+              audio_last_error != 0U) {
+        lv_label_set_text(btn, LV_SYMBOL_PLAY);
+        if(animation_mode_is(audio_img, "W")) startAnim(audio_img, "C", 500, 0, 1, 7);
     } else if(audio_play_state == AUDIO_END && audio_last_state != AUDIO_END) {
         startAnim(audio_img, "C", 500, 100, 1, 7);
         lv_label_set_text(btn, LV_SYMBOL_PLAY);

@@ -101,6 +101,7 @@ typedef struct
 
 extern volatile uint8_t audio_play_request;
 extern volatile uint8_t audio_play_state;
+extern volatile uint8_t audio_last_error;
 extern volatile uint8_t audio_rec_request;
 extern volatile uint8_t audio_rec_state;
 extern FIL WAV_File;
@@ -113,5 +114,8 @@ uint8_t PlayWaveFile(char *pname);
 uint8_t RecordWaveFile(char *fname,uint32_t fs);
 uint8_t Get_WAV_Message(char* fname,wavctrl* wavx);
 uint32_t Fill_WAV_Buffer(uint8_t *BUFF, uint16_t size);
+/* Absolute playback volume: 0=mute, 100=current output maximum; clamp above 100.
+ * May be called by the GUI before/during playback. The audio task applies it.
+ * Retained between tracks in RAM; changing it does not resume paused playback. */
 void Volum_Control(uint8_t ctrl);
 #endif //WM8960_TEST_WM8960APPS_H

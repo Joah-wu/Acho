@@ -1,25 +1,27 @@
 #include "WM8960.h"
 #include "i2s.h"
 #include "stdio.h"
+#include <string.h>
 
 #define WM8960_ADDRESS  0x34
 #define USE_BOARD_MIC
 
 static void delay_us(uint32_t nus)
 {
-  while(nus--)
-  {
-    __NOP();
-  }
+  uint32_t start = DWT->CYCCNT;
+  uint32_t cycles = nus * (SystemCoreClock / 1000000U);
+  while((uint32_t)(DWT->CYCCNT - start) < cycles) { __NOP(); }
 }
 void IIC_Init(void)
 {
-  GPIO_InitTypeDef GPIO_Initure;
+  GPIO_InitTypeDef GPIO_Initure = {0};
 
   __HAL_RCC_GPIOB_CLK_ENABLE();   //GPIOB CLOCK ENABLE
 
-  //PB6,PB7 INITIALIZE
-  GPIO_Initure.Pin=GPIO_PIN_8|GPIO_PIN_9;
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  // PB8 = SCL, PB7 = SDA on the Acho motherboard.
+  GPIO_Initure.Pin=WM8960_I2C_SCL_Pin|WM8960_I2C_SDA_Pin;
   GPIO_Initure.Mode=GPIO_MODE_OUTPUT_OD;
   GPIO_Initure.Pull=GPIO_NOPULL;
   GPIO_Initure.Speed=GPIO_SPEED_HIGH;
@@ -28,20 +30,20 @@ void IIC_Init(void)
   IIC_SDA=1;
   IIC_SCL=1;
 }
-void SDA_OUT()
+void SDA_OUT(void)
 {
-  GPIO_InitTypeDef GPIO_Initure;
+  GPIO_InitTypeDef GPIO_Initure = {0};
 
-  GPIO_Initure.Pin=GPIO_PIN_9;
+  GPIO_Initure.Pin=WM8960_I2C_SDA_Pin;
   GPIO_Initure.Mode=GPIO_MODE_OUTPUT_OD;
   GPIO_Initure.Pull=GPIO_NOPULL;
   GPIO_Initure.Speed=GPIO_SPEED_HIGH;
   HAL_GPIO_Init(GPIOB,&GPIO_Initure);
 }
-void SDA_IN()
+void SDA_IN(void)
 {
-  GPIO_InitTypeDef GPIO_Initure;
-  GPIO_Initure.Pin=GPIO_PIN_9;
+  GPIO_InitTypeDef GPIO_Initure = {0};
+  GPIO_Initure.Pin=WM8960_I2C_SDA_Pin;
   GPIO_Initure.Mode=GPIO_MODE_INPUT;
   GPIO_Initure.Pull=GPIO_NOPULL;
   GPIO_Initure.Speed=GPIO_SPEED_HIGH;
@@ -135,13 +137,11 @@ void IIC_Send_Byte(uint8_t data)
 /**
   * @brief send one byte command with parameters
   * return value 3,2,1: failed ,0:success
-  * A data transfer sequence is initiated by the master producing the START
-    condition (S) and sending a write header byte 0xA0, followed by a command
-    byte.Then send the parameter bytes.
+  * Send the WM8960 write address (0x34), then its register/data bytes.
   */
-uint8_t IIC_Write_Bytes(uint8_t * pdata, uint16_t num)
+uint8_t IIC_Write_Bytes(const uint8_t *pdata, uint16_t num)
 {
-  uint8_t i;
+  uint16_t i;
   IIC_Start();
   IIC_Send_Byte(WM8960_ADDRESS);
   if(IIC_Wait_Ack() == 1)
@@ -165,8 +165,8 @@ uint8_t IIC_Write_Bytes(uint8_t * pdata, uint16_t num)
   return 0;
 }
 
-//resgister value
-static uint16_t WM8960_REG_VAL[56] =
+/* The two-wire interface is write-only; retain a shadow for masked updates. */
+static const uint16_t WM8960_REG_DEFAULT[56] =
 {  
   0x0097, 0x0097, 0x0000, 0x0000, 0x0000, 0x0008, 0x0000, 0x000A,
   0x01C0, 0x0000, 0x00FF, 0x00FF, 0x0000, 0x0000, 0x0000, 0x0000,
@@ -177,6 +177,8 @@ static uint16_t WM8960_REG_VAL[56] =
   0x0000, 0x0037, 0x004D, 0x0080, 0x0008, 0x0031, 0x0026, 0x00ED
 };
 
+static uint16_t WM8960_REG_VAL[56];
+
 /**
   * @brief  Write register of WM8960.
   * @param  reg: The number of resigter which to be read.
@@ -184,149 +186,158 @@ static uint16_t WM8960_REG_VAL[56] =
   * @retval The value of regsiter.
   */
 uint8_t WM8960_Write_Reg(uint8_t reg, uint16_t dat)  {
+  if(reg >= 56U || dat > 0x01FFU) {
+    printf("WM8960 invalid write: reg=0x%02X value=0x%03X\r\n",
+           (unsigned int)reg, (unsigned int)dat);
+    return 1;
+  }
   
-//  uint8_t res,I2C_Data[2];
-//
-//  I2C_Data[0] = (reg<<1)|((uint8_t)((dat>>8)&0x0001));  //RegAddr
-//  I2C_Data[1] = (uint8_t)(dat&0x00FF);                  //RegValue
-//
-//  res = HAL_I2C_Master_Transmit(&hi2c1,(WM8960_ADDRESS<<1),I2C_Data,2,10);
-//  if(res == HAL_OK)
-//    WM8960_REG_VAL[reg] = dat;
-//
-//  return res;
   uint8_t res,I2C_Data[2];
 
   I2C_Data[0] = (reg<<1)|((uint8_t)((dat>>8)&0x0001));  //RegAddr
   I2C_Data[1] = (uint8_t)(dat&0x00FF);                  //RegValue
 
   res = IIC_Write_Bytes(I2C_Data,2);
-  if(res == HAL_OK)
-    WM8960_REG_VAL[reg] = dat;
+  if(res == HAL_OK) {
+    if(reg == 0x0FU) memcpy(WM8960_REG_VAL, WM8960_REG_DEFAULT, sizeof(WM8960_REG_VAL));
+    else WM8960_REG_VAL[reg] = dat;
+  } else {
+    printf("WM8960 I2C failed: addr=0x1A reg=0x%02X value=0x%03X status=%u (%s)\r\n",
+           (unsigned int)reg, (unsigned int)dat, (unsigned int)res,
+           res == 1U ? "address NACK" : "data NACK");
+  }
 
   return res;
 }
 
 /**
-  * @brief  Read register of WM8960.
+  * @brief  Read the local WM8960 register shadow.
   * @param  reg: The number of resigter which to be read.
   * @retval The value of regsiter.
   */
 uint16_t WM8960_Read_Reg(uint8_t reg) {
   
-  return WM8960_REG_VAL[reg];
+  return (reg < 56U) ? WM8960_REG_VAL[reg] : 0U;
 }
 
 
 /**
   * @brief  Initialize WM8960 device.
-  * @param  mode: only WM8960_MODE_DAC_ENABLE=1 or WM8960_MODE_ADC_ENABLE or their company
+  * @param  mode: DAC_ENABLE or ADC_ENABLE (shared SD wire, half duplex).
   * @retval res :Status
   */
-uint8_t WM89060_Init(uint8_t mode)  {
-  IIC_Init();
-  uint8_t res;
-  
-  //Reset Device
-  res = WM8960_Write_Reg(0x0f, 0x0000);
-  if(res != 0)
-    return res;
-  else
-    printf("WM8960 reset completed !!\r\n");
-  
-  //Set Power Source
+/* Propagate every failed write: this codec has a write-only control interface. */
+#define WM_TRY_WRITE(reg, value) do { \
+    uint8_t status = WM8960_Write_Reg((reg), (value)); \
+    if(status != 0U) return status; \
+} while(0)
 
-  res =  WM8960_Write_Reg(0x19, 1<<7 | 1<<6 | 1<<1 );//VMID为2 x 50kΩ,VREF、MICB
-  res += WM8960_Write_Reg(0x2F, 1<<3 | 1<<2);//LOMIX,ROMIX enable
-  if(mode & WM8960_MODE_DAC_ENABLE){
-    res += WM8960_Write_Reg(0x1A,WM8960_REG_VAL[0x1A] | 1<<8 | 1<<7 | 1<<6 | 1<<5 | 1<<4 | 1<<3 | 1<<1);//DAC、OUT1、SPK、OUT3
-  }
-  if(mode & WM8960_MODE_ADC_ENABLE){
-    res +=  WM8960_Write_Reg(0x19,WM8960_REG_VAL[0x19] | 1<<5|1<<4|1<<3|1<<2);// 0x00E8);ADCL、ADCR、AINL、AINR
-    res += WM8960_Write_Reg(0x2F,WM8960_REG_VAL[0x2F] | 1<<5 | 1<<4);//LMIC,RMIC
-  }
-  if(res != 0)  {
-    printf("Source set fail !!\r\n");
-    printf("Error code: %d\r\n",res);
-    return res;
-  }
-  
-  //Configure clock
-  WM8960_Write_Reg(0x04, 0x0000);//divided by 256
+uint8_t WM89060_Init(uint8_t mode)
+{
+    if(mode != WM8960_MODE_DAC_ENABLE && mode != WM8960_MODE_ADC_ENABLE) return 1;
+    IIC_Init();
+    WM_TRY_WRITE(0x0F, 0);
+    /* Slave, half duplex. DACDAT and ADCDAT share the motherboard data wire. */
+    WM_TRY_WRITE(0x18, (1U << 6) | ((mode == WM8960_MODE_DAC_ENABLE) ? (1U << 3) : 0U));
+    WM_TRY_WRITE(0x19, (1U << 7) | (1U << 6) |
+                 ((mode == WM8960_MODE_ADC_ENABLE) ? 0x3EU : 0U));
+    WM_TRY_WRITE(0x2F, (mode == WM8960_MODE_DAC_ENABLE) ? 0x0CU : 0x30U);
+    WM_TRY_WRITE(0x04, 0);       /* SYSCLK=MCLK, ADC/DAC divide by 256. */
+    WM_TRY_WRITE(0x07, 0x0002);  /* I2S, 16-bit, codec slave. */
+    WM_TRY_WRITE(0x05, WM8960_REG_VAL[0x05] | (1U << 3)); /* Start muted. */
 
-  //Configure audio interface
-  //I2S format 16 bits word length
-  WM8960_Write_Reg(0x07, 0x0002);//FORMAT=10——>I2S Format;WL=00——>16位;MS=0——>slave
-
-  if(mode & WM8960_MODE_DAC_ENABLE) {
-    //Configure ADC/DAC
-    WM8960_Write_Reg(0x05, WM8960_REG_VAL[0x05] & (~(1<<3)));// Set DAC not Muted
-
-    //Configure HP_L and HP_R OUTPUTS
-    WM8960_Write_Reg(0x02, 1<<7 | 0x006F | 0x0100);  //LOUT1 Volume Set +6dB-16dB=-10dB Zero Cross Enable
-    WM8960_Write_Reg(0x03, 1<<7 | 0x006F | 0x0100);  //ROUT1 Volume Set +6dB-16dB=-10dB Zero Cross Enable
-
-    //Configure SPK_P and SPK_N
-    WM8960_Write_Reg(0x28, 1<<7 | 0x007a | 0x0100); //Left Speaker Volume  Full +6dB Zero Cross Enable
-    WM8960_Write_Reg(0x29, 1<<7 | 0x007a | 0x0100); //Right Speaker Volume Full +6dB
-
-    //Enable the OUTPUTS
-    WM8960_Write_Reg(0x31, WM8960_REG_VAL[0x31] | 1<<6 | 1<<7); //Enable Class D Speaker Outputs Left and Right
-
-    //Configure DAC volume
-    WM8960_Write_Reg(0x0A, 0x00FF | 0x0100);//Left Full 0dB
-    WM8960_Write_Reg(0x0B, 0x00FF | 0x0100);//Right Full 0dB
-
-    //3D
-//  WM8960_Write_Reg(0x10, 0x001F);
-    //Configure MIXER
-    WM8960_Write_Reg(0x22, 1<<8 );//| 1<<7);//第7位LI2LO 不使能才对，没用到input3直接输出
-    WM8960_Write_Reg(0x25, 1<<8 );//| 1<<7);//第7位RI2RO 不使能才对，没用到input3直接输出
-  }
-
-
-  if(mode & WM8960_MODE_ADC_ENABLE){
-    /*********PGA*********/
-    //Input PGA
-    WM8960_Write_Reg(0x00, 0x003F | 0x0100);//0x003F Left PGA Full
-    WM8960_Write_Reg(0x01, 0x003F | 0x0100);//0x003F Right PGA Full
-
-    //Input Signal Path
+    if(mode == WM8960_MODE_DAC_ENABLE) {
+        WM_TRY_WRITE(0x1A, 0x01FA);
+        WM_TRY_WRITE(0x02, 0x01EF);
+        WM_TRY_WRITE(0x03, 0x01EF);
+        WM_TRY_WRITE(0x28, 0x01FA);
+        WM_TRY_WRITE(0x29, 0x01FA);
+        /* Enable Class-D only after clocks, power and DMA have been prepared. */
+        WM_TRY_WRITE(0x31, WM8960_REG_VAL[0x31] & ~0x00C0U);
+        WM_TRY_WRITE(0x0A, 0x01FF);
+        WM_TRY_WRITE(0x0B, 0x01FF);
+        WM_TRY_WRITE(0x22, 0x0100);
+        WM_TRY_WRITE(0x25, 0x0100);
+    } else {
+        WM_TRY_WRITE(0x00, 0x013F);
+        WM_TRY_WRITE(0x01, 0x013F);
 #ifdef USE_BOARD_MIC
-    WM8960_Write_Reg(0x20, 0x0008 | 0x0100);
-    WM8960_Write_Reg(0x21, 0x0000);
-#elif USE_EARPHONE_MIC
-    WM8960_Write_Reg(0x20, 0x0000);
-    WM8960_Write_Reg(0x21, 0x0008 | 0x0100);
+        WM_TRY_WRITE(0x20, 0x0108);
+        WM_TRY_WRITE(0x21, 0);
+        WM_TRY_WRITE(0x17, 1U << 2);
+#else
+        WM_TRY_WRITE(0x20, 0);
+        WM_TRY_WRITE(0x21, 0x0108);
+        WM_TRY_WRITE(0x17, 1U << 3);
 #endif
+        WM_TRY_WRITE(0x2B, 0);
+        WM_TRY_WRITE(0x2C, 0);
+        WM_TRY_WRITE(0x15, 0x01EA);
+        WM_TRY_WRITE(0x16, 0x01EA);
+        WM_TRY_WRITE(0x14, 0x00F9);
+    }
+    WM_TRY_WRITE(0x17, WM8960_REG_VAL[0x17] | 0x01C3);
+    WM_TRY_WRITE(0x30, 0x000B);  /* JD2, MICBIAS=0.65*AVDD, thermal sensor. */
+    return 0;
+}
 
-    //Input Boost Mixer
-    WM8960_Write_Reg(0x2B, 0x0000); //MUTE L2 L3 TO MIXER
-    WM8960_Write_Reg(0x2C, 0x0000); //MUTE R2 R3 TO MIXER
+uint8_t WM8960_SetSampleRate(uint32_t samplerate)
+{
+    uint16_t class_d_div;
+    if(samplerate == 16000U) class_d_div = 4U;       /* 4.096MHz / 6 = 682.7kHz. */
+    else if(samplerate == 44100U) class_d_div = 7U;  /* 11.289MHz / 16 = 705.6kHz. */
+    else if(samplerate == 48000U) class_d_div = 7U;  /* 12.288MHz / 16 = 768kHz. */
+    else return 1;
+    WM_TRY_WRITE(0x04, 0);
+    WM_TRY_WRITE(0x08, (WM8960_REG_VAL[0x08] & ~0x01C0U) | (class_d_div << 6));
+    WM_TRY_WRITE(0x1B, (WM8960_REG_VAL[0x1B] & ~7U) |
+                 ((samplerate == 16000U) ? 3U : 0U));
+    return 0;
+}
 
-/*********ADC*********/
+/* PCM playback master volume for both headphone and speaker paths.
+ * Convert a linear amplitude percentage to the DAC's 0.5dB steps offline,
+ * keeping floating-point logarithms out of the firmware (50% is about -6dB).
+ * Output PGA gains and the pause/startup soft-mute state remain independent. */
+uint8_t WM8960_SetVolume(uint8_t percent)
+{
+    static const uint8_t dac_levels[101] = {
+        0, 175, 187, 194, 199, 203, 206, 209, 211, 213, 215, 217, 218, 220, 221, 222,
+        223, 224, 225, 226, 227, 228, 229, 229, 230, 231, 232, 232, 233, 233, 234, 235,
+        235, 236, 236, 237, 237, 238, 238, 239, 239, 240, 240, 240, 241, 241, 242, 242,
+        242, 243, 243, 243, 244, 244, 244, 245, 245, 245, 246, 246, 246, 246, 247, 247,
+        247, 248, 248, 248, 248, 249, 249, 249, 249, 250, 250, 250, 250, 250, 251, 251,
+        251, 251, 252, 252, 252, 252, 252, 253, 253, 253, 253, 253, 254, 254, 254, 254,
+        254, 254, 255, 255, 255
+    };
+    if(percent > 100U) percent = 100U;
+    uint16_t level = dac_levels[percent];
+    WM_TRY_WRITE(0x0A, level);          /* Stage left, DACVU=0. */
+    WM_TRY_WRITE(0x0B, level | 0x100U); /* DACVU=1: apply both channels together. */
+    return 0;
+}
 
-    //ADC Digital Volume Control
-    WM8960_Write_Reg(0x15, 0x00EA | 0x0100);//LEFT +30dB - 0.5dB*20 = +20dB
-    WM8960_Write_Reg(0x16, 0x00EA | 0x0100);//RIGHT +30dB - 0.5dB*20 = +20dB
+uint8_t WM8960_SetMute(uint8_t mute)
+{
+    return WM8960_Write_Reg(0x05, (WM8960_REG_VAL[0x05] & ~(1U << 3)) |
+                           (mute ? (1U << 3) : 0U));
+}
 
-#ifdef USE_BOARD_MIC
-    WM8960_Write_Reg(0x17, 1<<2);//ADC两个声道采用leftADCdata
-#elif USE_EARPHONE_MIC
-    WM8960_Write_Reg(0x17, 1<<3);//ADC两个声道采用rightADCdata
-#endif
+uint8_t WM8960_SetSpeakerEnable(uint8_t enable)
+{
+    return WM8960_Write_Reg(0x31, (WM8960_REG_VAL[0x31] & ~0x00C0U) |
+                           (enable ? 0x00C0U : 0U));
+}
 
-/*********ALC Control*********/
-    //Noise Gate Control
-    WM8960_Write_Reg(0x14, 0x00F9);//Ignore signal under -30dBfs
-  }
-  //Jack Detect
-  WM8960_Write_Reg(0x18, 1<<6 | 0<<5);//HPSWEN=1；HPSWPOL=0 高电平为耳机
-  WM8960_Write_Reg(0x17, WM8960_REG_VAL[0x17] | 0x01C3);//TSDEN=1过热关闭设备，需要开TSENSEN！
-	//VSEL=11对3v3节电；TOEN=1、TOCLKSEL=1——>jack detect开启快速响应
-  WM8960_Write_Reg(0x30, 0x0009|1<<1);//JD2（LINPUT3） used for jack detect input;
-	//MBSEL=1——>MicBias=0.65 * AVDD;TSENSEN=1开温度传感器
-  
-  return 0;
+uint8_t WM8960_PowerDown(void)
+{
+    uint8_t status = WM8960_SetMute(1);
+    status |= WM8960_SetSpeakerEnable(0);
+    /* Release the data wire before switching the STM32 I2S direction. */
+    status |= WM8960_Write_Reg(0x18, WM8960_REG_VAL[0x18] | (1U << 3));
+    status |= WM8960_Write_Reg(0x1A, 0);
+    status |= WM8960_Write_Reg(0x2F, 0);
+    status |= WM8960_Write_Reg(0x19, 0);
+    return status;
 }
 

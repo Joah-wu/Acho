@@ -60,7 +60,7 @@ void OTG_FS_IRQHandler(void);
 void DMA2_Stream5_IRQHandler(void);
 void DMA2_Stream6_IRQHandler(void);
 /* USER CODE BEGIN EFP */
-
+void DMA1_Stream3_IRQHandler(void);
 /* USER CODE END EFP */
 
 #ifdef __cplusplus

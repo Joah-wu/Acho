@@ -64,7 +64,11 @@ extern DMA_HandleTypeDef hdma_spi1_tx;
 extern TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN EV */
-
+extern DMA_HandleTypeDef hdma_spi2_rx;
+void DMA1_Stream3_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(&hdma_spi2_rx);
+}
 /* USER CODE END EV */
 
 /******************************************************************************/

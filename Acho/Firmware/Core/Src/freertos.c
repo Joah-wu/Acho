@@ -248,6 +248,7 @@ void StartGUITask(void *argument)
          (mount_result == FR_OK) ? "OK" : "failed",
          (int)mount_result);
   exf_showfree((uint8_t*)"0:");
+  if (mount_result == FR_OK) vTaskResume(audioTaskHandle);
   setup_ui(&ui_main, &ui_ROOT, NULL);
   /* Infinite loop */
   for(;;)
@@ -269,15 +270,13 @@ void StartGUITask(void *argument)
 void StartAudioTask(void *argument)
 {
   /* USER CODE BEGIN StartAudioTask */
-  static portTickType PreviousWakeTime;
-  const portTickType TimeIncrement = pdMS_TO_TICKS(100);
-  PreviousWakeTime = xTaskGetTickCount();
-  
   /* Infinite loop */
   for(;;)
   {
     PlayWaveFile(global_BUFF);
-    vTaskDelayUntil(&PreviousWakeTime, TimeIncrement);
+    /* During playback the driver blocks on DMA notifications. This delay is
+       only the idle command poll; it does not pace the audio stream. */
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
   /* USER CODE END StartAudioTask */
 }
