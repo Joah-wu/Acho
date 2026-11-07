@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Local Django and ESP SoftAP use HTTP; HTTPS retains system certificate validation. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors><certificates src="system" /></trust-anchors>
+    </base-config>
+</network-security-config>

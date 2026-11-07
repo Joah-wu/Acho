@@ -1,3 +1,5 @@
 {
-    "cmake.sourceDirectory": "/home/joahwu/stm32/Acho/ImgTransfer"
+    "cmake.sourceDirectory": "${workspaceFolder}/acho/Firmware/stm32f446",
+    "cmake.useCMakePresets": "always",
+    "idf.flashBaudRate": "115200"
 }

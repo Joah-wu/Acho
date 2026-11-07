@@ -1,0 +1,10 @@
+sample_rate: 16000
+duration: 1.0
+n_mfcc: 13
+n_mels: 26
+frame_ms: 25
+hop_ms: 10
+epochs: 100
+batch_size: 32
+learning_rate: 0.001
+threshold: 0.5

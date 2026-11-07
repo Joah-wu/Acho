@@ -1,0 +1,17 @@
+menu "Acho bridge"
+config ACHO_SERVER_URL
+    string "Django HTTP base URL (no trailing slash)"
+    default "http://192.168.1.100:8787"
+config ACHO_UART_TX
+    int "STM32 link TX GPIO (UART0 TXD0)"
+    range 0 21
+    default 21
+config ACHO_UART_RX
+    int "STM32 link RX GPIO (UART0 RXD0)"
+    range 0 21
+    default 20
+config ACHO_PROV_RESET_GPIO
+    int "Optional reset GPIO sampled at boot (avoid strapping pins; -1 disables)"
+    range -1 21
+    default -1
+endmenu

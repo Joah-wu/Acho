@@ -1,0 +1,5 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/Firmware/stm32f446",
+    "cmake.useCMakePresets": "always",
+    "idf.flashBaudRate": "115200"
+}

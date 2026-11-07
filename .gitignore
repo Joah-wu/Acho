@@ -1,0 +1,50 @@
+# Reproducible compiler and build-system output
+**/build/
+**/cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/compile_commands.json
+**/.ninja_deps
+**/.ninja_log
+
+# Local language / tool caches
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.gradle/
+**/.cxx/
+**/.externalNativeBuild/
+**/node_modules/
+**/.venv/
+**/.cache/
+**/local.properties
+
+# Regenerated X-CUBE-AI reports, not model / generated source code
+/acho/Firmware/stm32f446/.ai/
+
+# Editor / OS scratch files; retain shared IDE settings
+**/.idea/workspace.xml
+**/.idea/caches/
+**/.idea/shelf/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+# Do not ignore *.bin, *.jar, *.lib, media/, migrations/ or CAD globally.
+
+# image_encoder vendors only the upstream ZIP and checksum; local extraction is scratch.
+/image_encoder/release/*
+!/image_encoder/release/*.zip
+!/image_encoder/release/*.zip.sha256
+/image_encoder/img_src/
+/image_encoder/img_output/
+/image_encoder/bin_output/
+
+# Personal development notes and offline explorer; keep locally, never commit.
+**/*.local.md
+**/*.local.html
+/reviews/

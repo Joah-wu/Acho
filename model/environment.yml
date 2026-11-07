@@ -1,0 +1,12 @@
+name: ASR_TEMP
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch=2.5
+  - torchaudio=2.5
+  - numpy
+  - pyyaml
+  - onnx
+  - onnxruntime
